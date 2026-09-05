@@ -2,160 +2,154 @@
 
 ## Strategy
 
-Build and validate the clinic staff website first. Do not begin with WhatsApp or Supabase. The first proof must be that dental-clinic staff can register patients and book correct appointment ranges using the website.
+The product follows a disciplined **website-first and simulator-first strategy**. WhatsApp integration and Supabase migration are intentionally deferred until the clinic staff workflow, booking rules, and data models are thoroughly proven in a controlled real-world pilot.
 
-## Phase 0: Confirm the Clinic Workflow
+Core baseline:
+> **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
 
-**Objective:** Understand the real dental-clinic process before coding.
+---
 
-**Activities:**
+## Phase 1: Confirm the Real Dental-Clinic Workflow
 
-- Choose one dentist clinic as the first design partner.
-- Observe registration and appointment booking.
-- Identify the minimum patient and previous-visit fields.
-- Document how one, two, or three dentists are scheduled.
-- Document appointment duration, breaks, leave, and walk-ins.
-- Decide whether the clinic uses fixed appointment ranges or flexible slots.
-- Agree how staff will inspect or export the workbook.
+- **Objective:** Deeply understand and document the actual clinic workflow with a real design partner before writing UI code.
+- **Activities:**
+  - Partner with one single-location dental clinic.
+  - Shadow front-desk staff during patient registration and appointment scheduling.
+  - Finalize minimal patient fields and structured previous-visit summary format.
+  - Document dentist scheduling patterns: 1 primary dentist, with 2 or 3 dentists on peak days.
+  - Document standard appointment slot durations, lunch breaks, buffer times, and leave notice policies.
+- **Exit Gate:** Clinic approves the initial registration fields, appointment duration rules, and pilot success criteria.
+- **Stop or Pivot Condition:** Stop or revise if clinic scheduling patterns require unbounded dynamic duration rules before fixed ranges are tested.
 
-**Exit gate:** The clinic approves the first workflow, fields, availability rules, and pilot success measures.
+---
 
-## Phase 1: Staff Website Prototype
+## Phase 2: Staff Website Prototype
 
-**Objective:** Prove that the staff can use the website without WhatsApp.
+- **Objective:** Validate staff ergonomics, navigation, and usability through an intuitive web interface.
+- **Activities:**
+  - Build authenticated staff login view.
+  - Build patient registration form with duplicate detection prompt.
+  - Build patient search and profile view with structured previous-visit history.
+  - Build dentist schedule configuration view (working hours, breaks, leave dates).
+  - Build daily appointment calendar view.
+  - Build appointment booking modal with real-time slot selection.
+- **Exit Gate:** Receptionist can register a patient, review past visits, check availability, and book an appointment without developer assistance.
+- **Stop or Pivot Condition:** Pivot layout or form design if receptionists find the workflow too slow or confusing under simulated front-desk time pressure.
 
-**Build:**
+---
 
-- Staff login.
-- Patient registration form.
-- Patient search.
-- Patient profile.
-- Previous-visit list and structured summary entry.
-- Dentist list.
-- Basic schedule and availability screen.
-- Appointment creation form.
+## Phase 3: FastAPI and Excel Pilot Backend
 
-At this stage, the interface may use test data or a local file. Focus on workflow clarity, not production infrastructure.
+- **Objective:** Deliver a robust, typed backend API backed by controlled, single-writer Excel pilot storage.
+- **Status:** **COMPLETED & VERIFIED** (FastAPI MVC architecture, 9-sheet openpyxl repository, atomic writes, OS file locking, pre-write backups, full test suite passing).
+- **Activities:**
+  - Build FastAPI REST controllers for patients, visits, dentists, schedules, leaves, and appointments.
+  - Implement 9-sheet workbook schema (`Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`).
+  - Implement atomic write mechanism (write to `.tmp` -> validate -> `os.replace()`).
+  - Implement file locking (`filelock.FileLock`) using the **lock-once-delegate pattern** to prevent re-entrant deadlocks.
+  - Implement automatic rolling backups before every modifying write.
+  - Implement collision-free sequenced ID generators (`PAT-XXXXXX`, `APT-XXXXXX`, etc.).
+- **Exit Gate:** All automated tests pass (10/10 green), zero deadlocks, and verified atomic persistence.
+- **Stop or Pivot Condition:** If file corruption occurs under load, immediately halt feature development until storage safety invariants are restored.
 
-**Exit gate:** Staff can register a patient, find the patient, review previous visits, and book an appointment range without developer assistance.
+---
 
-## Phase 2: FastAPI and Excel Pilot Backend
+## Phase 4: Patient Registration and Previous-Visit Workflow
 
-**Objective:** Make the website operational with controlled temporary storage.
+- **Objective:** Connect the staff website frontend to the FastAPI patient and visit endpoints.
+- **Activities:**
+  - Integrate frontend registration form with `POST /api/patients`.
+  - Handle duplicate detection warnings (HTTP 409) with explicit staff bypass confirmation (`force_create=true`).
+  - Connect patient search by name, phone, or ID to `GET /api/patients/search`.
+  - Connect patient profile and structured visit entry to `POST /api/visits` and `GET /api/visits/patient/{patient_id}`.
+- **Exit Gate:** Front-desk staff can register new patients, view instant duplicate warnings, and append structured visit summaries that persist reliably to `clinic_data.xlsx`.
+- **Stop or Pivot Condition:** Revise search indexing or duplicate matching logic if staff experience false-positive duplicate blocking.
 
-**Build:**
+---
 
-- FastAPI API.
-- Structured workbook schema.
-- One workbook per clinic.
-- Workbook repository using `openpyxl` or equivalent.
-- File lock and atomic write process.
-- Backup before writes.
-- Stable identifiers.
-- Patient, visits, dentists, availability, appointments, staff, metadata, and audit sheets.
-- Validation and error recovery.
+## Phase 5: Dentist Availability and Appointment-Range Booking
 
-**Exit gate:** Every successful website action produces a correct workbook record and every failed write is visible to staff.
+- **Objective:** Connect frontend booking and schedule views to the central availability calculation and appointment services.
+- **Activities:**
+  - Connect dentist schedule configuration to `PUT /api/dentists/{id}/schedule/{day_of_week}` and `POST /api/dentists/{id}/leaves`.
+  - Connect slot selection to `GET /api/availability/slots?dentist_id={id}&date={date}`.
+  - Verify that working hours, breaks, leaves, and booked appointments are deducted correctly.
+  - Connect booking submission to `POST /api/appointments`.
+  - Implement appointment rescheduling and cancellation workflows.
+- **Exit Gate:** Zero double bookings under concurrent booking attempts; schedule updates instantly on the daily calendar.
+- **Stop or Pivot Condition:** If slot generation logic creates conflicting ranges, halt and fix core service algorithms before continuing.
 
-## Phase 3: Scheduling Reliability
+---
 
-**Objective:** Make dentist availability and appointment booking trustworthy.
+## Phase 6: Build Patient Request Simulator
 
-**Build:**
+- **Objective:** Build an external patient request simulator to imitate the future WhatsApp patient experience in the absence of a live WhatsApp business number.
+- **Activities:**
+  - Build a standalone simulator web interface (chat-like or simple structured form).
+  - Allow tester/patient to enter name, phone, preferred dentist, preferred date, slot range, and visit reason.
+  - Connect simulator to FastAPI patient-request endpoints (`/api/patient-request` or shared appointment services).
+  - Display available slots and booking confirmations back to the simulator.
+  - Verify that appointments booked via the simulator immediately appear on the staff website schedule.
+- **Exit Gate:** Simulator successfully creates valid, non-conflicting appointments through the exact same backend services that WhatsApp will later call.
+- **Stop or Pivot Condition:** If simulator requires custom business rules different from staff booking, halt immediately and reconcile domain services to maintain a single booking engine.
 
-- Working hours.
-- Dentist leave and blocked periods.
-- Breaks.
-- Appointment duration.
-- Fixed appointment ranges or approved slot rules.
-- Conflict detection.
-- Double-booking tests.
-- Cancellation and rescheduling.
-- Timezone handling.
-- Appointment status history.
+---
 
-**Exit gate:** The system passes concurrent booking, duplicate submission, cancellation, rescheduling, and failed-write tests.
+## Phase 7: Controlled Clinic Pilot
 
-## Phase 4: Controlled Clinic Pilot
+- **Objective:** Deploy the staff website and simulator in a single real-world dental clinic for a 2–4 week evaluation.
+- **Activities:**
+  - Deploy backend and frontend on clinic hardware or controlled persistent server.
+  - Conduct staff training session.
+  - Maintain existing clinic paper/manual booking as a parallel safety fallback.
+  - Monitor rolling backups, file-lock performance, and data integrity daily.
+  - Measure staff registration speed, booking accuracy, and error frequency.
+- **Exit Gate:** Staff use DentalFlow exclusively for 2 continuous weeks with positive adoption and zero corrupted records.
+- **Stop or Pivot Condition:** If staff repeatedly abandon the software for their old manual process, pause pilot and redesign problematic workflows.
 
-**Objective:** Use the website with one real dental clinic.
+---
 
-**Activities:**
+## Phase 8: Decide on Supabase Migration
 
-- Use clinic-approved fields and workflows.
-- Train staff.
-- Keep the current manual process as a fallback.
-- Monitor workbook backups and failures.
-- Record staff friction and missing requirements.
-- Measure time to register a patient and book an appointment.
-- Measure scheduling errors and staff adoption.
+- **Objective:** Transition storage from the temporary Excel pilot workbook to Supabase (PostgreSQL) when scaling or reliability criteria are met.
+- **Trigger Conditions (Any of the following):**
+  - Clinic adds concurrent front-desk terminals requiring simultaneous write access.
+  - Product expands to a second clinic location.
+  - Workbook file size or lock contention introduces observable latency.
+  - Preparing for live WhatsApp customer traffic.
+- **Activities:**
+  - Freeze Excel workbook schema.
+  - Execute automated migration script transferring normalized sheets to PostgreSQL tables.
+  - Verify 100% row parity, foreign keys, and sequenced ID continuity.
+  - Implement `PostgresRepository` adhering to the existing repository interface.
+  - Swap repository implementation via FastAPI dependency injection.
+- **Exit Gate:** Full test suite passes against Supabase; staff website operates identically with zero data loss.
+- **Stop or Pivot Condition:** If migration script shows record discrepancies, roll back immediately to the archived Excel snapshot.
 
-**Exit gate:** Staff use the website repeatedly for at least two weeks and confirm that it is better than their current process.
+---
 
-## Phase 5: Decide on Supabase Migration
+## Phase 9: Add Real WhatsApp Integration
 
-**Objective:** Move beyond Excel only when evidence justifies it.
+- **Objective:** Replace the Patient Request Simulator with official WhatsApp Business Platform integration.
+- **Activities:**
+  - Provision verified WhatsApp Business Account (WABA) and dedicated phone number.
+  - Implement secure webhook endpoint (`POST /api/webhooks/whatsapp`) with signature verification.
+  - Build conversation state handler to collect patient details, requested dentist, and preferred slot.
+  - Wire webhook handler to the existing `AvailabilityService` and `AppointmentService`.
+  - Implement human escalation path to notify front-desk staff when patient intent is ambiguous.
+- **Exit Gate:** Live WhatsApp message from a patient creates an appointment on the staff schedule, and patient receives an automated confirmation template.
+- **Stop or Pivot Condition:** If WhatsApp messaging costs or API policy changes affect viability, retain the web-based booking simulator/portal as a customer alternative.
 
-Migrate when multiple staff need concurrent writes, more than one clinic is active, workbook size or reliability becomes a problem, backups and access control need to be stronger, or the product is ready for WhatsApp traffic.
+---
 
-**Migration activities:**
+## Go/No-Go Decision Matrix
 
-- Freeze the workbook schema.
-- Export each sheet.
-- Normalize into tables.
-- Preserve stable identifiers.
-- Compare row counts and important records.
-- Run parallel verification.
-- Keep the original workbook as an archive.
-- Switch the repository implementation from Excel to Supabase.
-
-**Exit gate:** The same website workflow works against Supabase with verified data parity.
-
-## Phase 6: Add WhatsApp Patient Input
-
-**Objective:** Allow patients to submit appointment requests through WhatsApp.
-
-**Build:**
-
-- Official WhatsApp Business integration.
-- Verified webhook.
-- Patient opt-in and opt-out handling.
-- Patient identification or registration flow.
-- Preferred dentist selection.
-- Date or appointment-range selection.
-- Availability response.
-- Human handoff.
-- Confirmation and reminder templates.
-- Idempotent webhook processing.
-
-WhatsApp must call the same patient, availability, and appointment services as the staff website. It must not create a separate scheduling implementation.
-
-**Exit gate:** A WhatsApp request can become a staff-visible appointment without duplicate records or conflicting availability.
-
-## Phase 7: Productize and Expand
-
-**Objective:** Make onboarding repeatable and add only validated capabilities.
-
-Possible later capabilities:
-
-1. Waitlist and cancellation recovery.
-2. Follow-up reminders.
-3. Multiple dentists and locations.
-4. Payment links.
-5. Practice-management integrations.
-6. More detailed clinical records after proper review.
-7. Constrained staff-assistance AI.
-
-Do not add diagnosis, prescription generation, or autonomous clinical decisions as ordinary roadmap items.
-
-## Go/No-Go Gates
-
-| Gate | Continue when | Stop or revise when |
+| Gate | Continue When | Stop or Revise When |
 |---|---|---|
-| Workflow | Staff agree on the real process | Requirements remain unclear |
-| Website prototype | Staff complete the core tasks | They need constant developer help |
-| Excel pilot | Writes and backups are reliable | Records are lost or frequently corrupted |
-| Clinic pilot | Staff use it repeatedly | Staff return immediately to the old process |
-| Supabase migration | Concurrent usage or reliability justifies it | Excel is sufficient and migration adds no value |
-| WhatsApp | Website workflow is stable | Website rules still change frequently |
-| Expansion | Customers repeatedly request the same capability | Features are based only on speculation |
+| **Workflow (Phase 1)** | Clinic approves fields and scheduling rules | Requirements remain ambiguous or change constantly |
+| **Website Prototype (Phase 2)** | Staff complete core flows independently | Staff struggle with basic navigation |
+| **Backend & Excel (Phase 3)** | Atomic writes, file locking, and tests pass | Workbook experiences locking deadlocks or data loss |
+| **Simulator (Phase 6)** | Simulator appointments flow into staff calendar | Simulator requires divergent booking logic |
+| **Clinic Pilot (Phase 7)** | Positive adoption after 2+ weeks | Staff revert to manual paper/Excel spreadsheets |
+| **Supabase Migration (Phase 8)** | 100% data parity verified across all entities | Any ID collision or missing historical visit |
+| **WhatsApp (Phase 9)** | Staff workflow is proven and number is active | Premature attempt before staff workflow is stable |

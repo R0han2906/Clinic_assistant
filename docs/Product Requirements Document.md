@@ -4,192 +4,207 @@
 
 **Working name:** DentalFlow
 
-**Product type:** Dentist-clinic staff website with temporary Excel-based data storage and a later WhatsApp patient-input channel.
+**Product type:** Dentist-clinic staff website with a Patient Request Simulator, temporary Excel-based pilot storage, and a later WhatsApp patient-input channel.
 
-**Document status:** Revised product baseline
+**Document status:** Revised product baseline (aligned with website-first & simulator-first architecture)
 
 ## 1. Important Scope Decision
 
-The first product is **not** a WhatsApp bot and not a general hospital-management system.
+The first product is **not** a live WhatsApp bot and **not** a general hospital-management system.
 
-The first product is a website used by a dental clinic’s staff to register patients, record previous visits, manage dentists and their availability, and book appointment ranges. WhatsApp will be integrated only after the website workflow is proven.
+The core release statement is:
+> **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
+
+There is currently **no dedicated business WhatsApp number** available. Therefore, the initial version must not depend on a live WhatsApp account, dedicated phone number, or WhatsApp Business Platform integration.
+
+Instead, the product introduces a **Patient Request Simulator** that imitates the structured requests a patient would later send through WhatsApp. It submits requests directly to the same FastAPI backend services that the future WhatsApp webhook will use.
 
 For this document, “hospital” means **dentist clinic**.
 
 ## 2. Product Summary
 
-DentalFlow gives dental-clinic staff a simple internal website. Staff can register a patient, record basic patient details, record previous visit information, select the dentist requested by the patient, check whether the dentist is available, and book an appointment range.
+DentalFlow provides dental-clinic staff with a simple, reliable internal website. Staff can register a patient, record basic registration details, record structured previous visit summaries, select the dentist requested by the patient, check dentist availability, and book an appointment range.
 
-During the initial iteration stage, the system stores data in a structured Excel workbook rather than Supabase. The website remains the main user interface for staff. The workbook is the temporary pilot data store and can also be inspected or exported by staff.
+To test and prove patient-side appointment workflows without waiting for a business WhatsApp number, DentalFlow includes a **Patient Request Simulator**. The simulator acts as an input adapter sending structured appointment requests to the FastAPI backend.
 
-Later, patients will provide appointment input through WhatsApp. WhatsApp will send structured requests to the same backend workflow used by the staff website. It will not create a separate booking system.
+### Intended Flow (Current Iteration)
+```text
+Patient Request Simulator
+        -> FastAPI patient-request endpoint
+        -> patient and availability services
+        -> appointment service
+        -> temporary Excel storage
+        -> clinic staff website
+```
+
+### Future Flow (Post-Validation)
+```text
+Patient WhatsApp
+        -> WhatsApp webhook
+        -> same FastAPI patient-request and appointment services
+        -> Supabase or approved production storage later
+        -> clinic staff website
+```
+
+During the initial iteration stage, the system stores data in a structured Excel workbook (`clinic_data.xlsx`) rather than Supabase. The website remains the primary user interface for staff. The workbook is the temporary pilot data store and can be inspected or exported by staff.
+
+Later, patients will submit appointment requests through WhatsApp. WhatsApp will send structured requests to the exact same backend workflow. It will not create a separate booking system.
 
 ## 3. Product Vision
 
-> Give small dental clinics a simple, reliable way to register patients and manage dentist availability before introducing WhatsApp automation.
+> Give small dental clinics a simple, reliable way to register patients, manage dentist availability, and simulate patient requests before introducing real WhatsApp automation and cloud database infrastructure.
 
 ## 4. First Target Customer
 
-The first customer is a single-location dental clinic with one dentist most of the time, with support for two or three dentists when necessary. The clinic has front-desk staff who need a clear way to register patients and schedule appointments.
+The first customer is a single-location dental clinic with one dentist most of the time, with support for two or three dentists when necessary. The clinic has front-desk staff who need a clear, dependable way to register patients, record past visits, and schedule appointments without double booking.
 
-The first release should not target hospitals, large dental chains, emergency departments, or complex multi-location practices.
+The first release does not target general hospitals, large dental chains, emergency departments, or complex multi-location practices.
 
 ## 5. Users
 
 | User | Main need |
 |---|---|
-| Receptionist or clinic staff | Register patients, review history, check dentist availability, and book appointments |
-| Dentist | See their schedule and upcoming patient appointments |
-| Clinic owner | Review operational activity and maintain dentist configuration |
-| Platform administrator | Configure, support, and maintain the product |
-| Patient | Later, submit appointment information through WhatsApp |
+| Receptionist or clinic staff | Register patients, review previous visits, check dentist availability, and book/manage appointments |
+| Dentist | Review daily schedule, appointments, and patient summaries |
+| Clinic owner | Review operational activity, working hours, and dentist availability |
+| Platform administrator / Developer | Configure clinic settings, inspect workbook data health, and manage system backups |
+| Simulator User / Tester | Simulate patient appointment requests imitating future WhatsApp messages |
+| Patient (Later Phase) | Submit appointment requests through WhatsApp once a dedicated business number is configured |
 
 ## 6. Product Principles
 
 1. **Website first:** Build and validate the clinic staff workflow before WhatsApp.
-2. **Excel first, but temporary:** Use a structured workbook for early iterations; do not treat it as the final production database.
-3. **One booking engine:** Website bookings and future WhatsApp bookings must use the same availability and appointment rules.
-4. **Small-clinic focus:** Optimize for a single dental clinic before supporting complex organizations.
-5. **Human control:** Staff can review and correct every appointment.
-6. **Administrative scope:** Store only the patient information needed for the initial workflow.
-7. **No unsafe clinical automation:** Do not diagnose or prescribe.
-8. **Migration-ready:** Excel columns and identifiers must be designed so that migration to Supabase or PostgreSQL is straightforward.
+2. **Simulator first for patient input:** Use a Patient Request Simulator to prove patient-side workflows before acquiring WhatsApp Business infrastructure.
+3. **Excel first, but temporary:** Use a structured workbook for early iterations; do not treat it as the final production database.
+4. **One booking engine:** Website bookings, simulator requests, and future WhatsApp bookings must use the identical availability and appointment domain rules.
+5. **Small-clinic focus:** Optimize for a single dental clinic before supporting complex multi-facility organizations.
+6. **Human control:** Staff can review, modify, reschedule, or cancel every appointment.
+7. **Administrative scope:** Store only administrative and registration information needed for scheduling.
+8. **No unsafe clinical automation:** Strictly administrative; do not diagnose, triage, or prescribe.
+9. **Migration-ready:** Excel columns, types, and identifiers must be strictly normalized so migration to Supabase or PostgreSQL requires zero application logic changes.
 
 ## 7. MVP Goals
 
-The first website MVP must allow staff to:
+The first release must allow staff and testers to:
 
-- Log in securely.
-- Register a patient.
-- Record patient name, age or date of birth, phone number, and relevant basic details.
-- Record previous visit information in a structured way.
-- Select a requested dentist.
-- See whether one, two, or three dentists are available.
-- View valid appointment ranges.
-- Book an appointment range.
-- Modify or cancel an appointment.
-- View the dentist’s schedule.
-- Search for an existing patient.
-- Review the patient’s previous visits.
-- Store and retrieve the records from a structured Excel workbook.
+- Authenticate safely into the staff website.
+- Register a patient with name, age/DOB, phone number, and required clinic acknowledgements.
+- Check for duplicate patients before creating new records.
+- Record concise, structured previous visit summaries.
+- Configure and inspect dentist working hours, breaks, and leaves.
+- See whether one, two, or three dentists are available on any given date.
+- Calculate valid appointment ranges excluding working hours, breaks, leaves, and booked appointments.
+- Book, reschedule, and cancel appointment ranges with zero double bookings.
+- Review the daily dentist schedule.
+- Search for existing patients by name, phone, or stable identifier.
+- Store and retrieve all records from a structured 9-sheet Excel workbook with file locking and atomic writes.
+- Submit simulated patient appointment requests via the **Patient Request Simulator** and verify that requests appear correctly on the staff website.
+- Export or download the Excel workbook for backup or manual audit.
 
 ## 8. Initial Data Scope
 
 ### Patient registration
-
-The initial patient record should contain only the fields needed for registration and appointment operations:
-
-- Patient identifier.
+The patient record contains only fields required for registration and scheduling operations:
+- Patient identifier (`PAT-000001` format).
 - Full name.
 - Age or date of birth.
 - Phone number.
-- Optional email.
-- Emergency-contact information only if the clinic explicitly requires it.
-- Consent or acknowledgement status where applicable.
-- Created date and last updated date.
+- Optional email address.
+- Emergency contact information (only if explicitly required by clinic).
+- Consent / acknowledgement status.
+- Created timestamp and last updated timestamp.
 
 ### Previous visits
-
-The first version should not attempt to recreate a complete electronic medical record. It should store a structured visit summary such as:
-
-- Visit identifier.
+Structured visit summaries, not an unbounded electronic medical record (EMR):
+- Visit identifier (`VIS-000001` format).
 - Patient identifier.
 - Visit date.
-- Dentist.
-- Visit type.
-- Short staff-entered summary.
-- Follow-up date or recommendation, if the clinic chooses to record it.
+- Dentist identifier and name.
+- Visit type (e.g., consultation, cleaning, follow-up, procedure).
+- Short staff-entered summary (concise administrative notes).
+- Follow-up recommendation date, if applicable.
 
-Avoid storing unnecessary clinical detail until the data model, privacy controls, retention policy, and professional requirements are reviewed.
-
-### Dentist availability
-
-The system should support:
-
-- Dentist name and profile.
-- Working days and hours.
-- Breaks.
-- Leave or blocked periods.
-- Appointment duration or slot range.
-- Current availability.
-- Maximum number of parallel dentists supported by the clinic configuration.
+### Dentist availability & scheduling
+- Dentist identifier (`DOC-000001` format) and profile.
+- Working days and hours per day of the week.
+- Break periods.
+- Leave and blocked date ranges.
+- Standard slot duration (e.g., 30 or 60 minutes).
+- Active status.
+- Maximum parallel dentists supported (1 to 3 dentists).
 
 ## 9. Appointment Requirements
 
 The appointment flow must:
-
-1. Identify the patient.
+1. Identify the patient (existing or newly registered).
 2. Show the requested dentist or available dentists.
-3. Check dentist working hours, leave, breaks, and existing appointments.
-4. Show valid appointment ranges.
-5. Allow staff to select a range.
-6. Confirm the dentist, date, start time, end time, and patient.
-7. Save the appointment to the workbook.
-8. Prevent conflicting appointments within the configured scope.
-9. Show the updated schedule.
+3. Evaluate dentist working hours, leave, breaks, and existing appointments under a single read lock.
+4. Return valid non-conflicting appointment ranges.
+5. Allow staff (or simulator) to select a valid range.
+6. Atomically lock, re-validate, and persist the appointment to the workbook.
+7. Record an audit log entry.
+8. Display the confirmed appointment on the daily schedule.
 
-The first version may use fixed appointment ranges. Flexible slot generation can be added only after the clinic’s actual scheduling pattern is understood.
+The first version uses deterministic slot calculation. Flexible dynamic slotting will be added only after real clinic scheduling patterns are observed.
 
 ## 10. Website Requirements
 
 The staff website must provide:
+- Secure staff authentication.
+- Patient registration form with duplicate detection.
+- Patient search and profile management.
+- Structured previous-visit entry and history view.
+- Dentist schedule configuration (hours per weekday, breaks, leave dates).
+- Daily schedule view per dentist.
+- Appointment creation, rescheduling, and cancellation.
+- Real-time workbook health indicator.
+- Manual workbook export/download button.
+- Clear error handling for locked files or write conflicts.
 
-- Secure staff login.
-- Patient registration form.
-- Patient search and profile page.
-- Previous-visit list.
-- Dentist and availability setup.
-- Daily schedule view.
-- Appointment creation, edit, cancellation, and rescheduling.
-- Clear appointment status.
-- Workbook data-health indicator.
-- Manual export or download of the Excel workbook.
-- Basic audit information for important changes.
+## 11. Patient Request Simulator Requirements
 
-The website should not expose raw workbook internals as the primary experience. Staff should use clear forms and calendars; the workbook is the pilot storage layer and fallback inspection format.
+The Patient Request Simulator must:
+- Provide a clear test harness interface simulating the patient's perspective.
+- Capture: patient name, phone number, requested dentist (or "any"), preferred date, preferred time range, and appointment reason.
+- Submit structured JSON payloads to the FastAPI patient-request endpoint.
+- Receive and display available slots or booking confirmations.
+- Be completely decoupled from the staff website UI, functioning strictly as an external input adapter.
 
-## 11. WhatsApp Later
+## 12. WhatsApp Later
 
-WhatsApp is a later phase. It will collect administrative input such as:
+WhatsApp is deferred to a later phase once a dedicated WhatsApp Business number is provisioned and internal workflows are stabilized.
 
-- Patient name.
-- Phone number.
-- Preferred dentist.
-- Preferred date or date range.
-- Preferred appointment range.
-- Basic appointment reason, if the clinic approves it.
+When integrated, WhatsApp will:
+- Act purely as an input channel replacing the simulator adapter.
+- Convert incoming WhatsApp messages into the exact same command structures used by the simulator.
+- Use the identical FastAPI availability and appointment services.
+- Never write directly to the Excel workbook or bypass business rules.
 
-The WhatsApp flow must send the request to the same backend booking service. It must not write directly to Excel or create a separate set of appointment rules.
+## 13. Explicitly Out of Scope
 
-## 12. Explicitly Out of Scope
+- Real WhatsApp Business Platform integration in the first release.
+- Live business phone number dependency.
+- Supabase or PostgreSQL in the first iteration.
+- Full electronic medical record (EMR) system.
+- Clinical diagnosis, medical advice, or prescription generation.
+- Emergency triage or urgent care routing.
+- Billing, insurance claims, pharmacy, or laboratory integration.
+- Multi-location clinic hierarchies.
+- Native mobile applications (iOS/Android).
 
-- WhatsApp integration in the first website iteration.
-- Supabase in the first iteration.
-- Complete medical records.
-- Diagnosis, treatment advice, or prescription generation.
-- Emergency triage.
-- Billing, insurance, pharmacy, or laboratory management.
-- Multi-location organizations.
-- Patient mobile application.
-- Fully automatic clinical follow-up.
+## 14. Success Metrics
 
-## 13. Success Metrics
-
-| Metric | Initial target |
+| Metric | Initial Target |
 |---|---|
-| Pilot dental clinics | At least 1, preferably 3 |
-| Staff completing registration without developer help | 100% of pilot staff |
-| Appointment conflict rate | Zero confirmed double bookings |
-| Patient lookup accuracy | Staff can find the correct patient reliably |
-| Data-write reliability | Every confirmed action produces a saved workbook record |
-| Time to create an appointment | Faster than the clinic’s current process |
-| Staff willingness to continue | Positive after at least two weeks of use |
-| Excel-to-database migration readiness | All records have stable identifiers and consistent columns |
+| Pilot dental clinics | 1 partner clinic (expandable to 3) |
+| Staff self-sufficiency | 100% of staff complete registration and booking without developer intervention |
+| Double booking rate | 0% double bookings under concurrent staff and simulator activity |
+| Data-write reliability | 100% of confirmed actions persisted atomically with zero corruption |
+| Simulator-to-Staff workflow | Simulated patient requests appear on staff schedule in real time |
+| Excel-to-Database migration readiness | 100% of records use stable sequenced IDs and strict column types |
+| Staff satisfaction | Positive feedback after 2 weeks of continuous operational use |
 
-## 14. Product Positioning
+## 15. Product Positioning
 
-The first product should be positioned as:
-
-> A simple dental-clinic appointment and patient-registration website that helps staff manage dentist availability and patient history without forcing the clinic to adopt a complex hospital system.
-
-WhatsApp should be positioned later as a convenient patient-input channel, not as the product’s foundation before the internal clinic workflow is proven.
+The product is positioned as:
+> **A simple, dedicated dental-clinic appointment and patient-registration website with a patient-request simulator, helping staff manage dentist availability and patient records without the bloat or cost of a generic hospital management suite.**

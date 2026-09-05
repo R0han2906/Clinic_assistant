@@ -2,107 +2,72 @@
 
 ## 1. Scope Rules
 
-1. The current product is for a dentist clinic, not a general hospital.
-2. The current release is the clinic staff website.
-3. WhatsApp integration is a later phase.
-4. Supabase is deferred until the workflow is validated.
-5. Excel is temporary pilot storage, not the final production database.
-6. Start with one clinic and one controlled workbook.
-7. Do not expand into hospital management, diagnosis, prescriptions, billing, or laboratory operations without an approved scope change.
+1. **Dentist-clinic scope:** The product is designed specifically for a dental clinic, not a general hospital.
+2. **Release definition:** The initial release consists of the dental clinic staff website and a **Patient Request Simulator**, powered by a FastAPI backend and temporary Excel pilot storage.
+3. **Simulator-first patient input:** Because no dedicated business WhatsApp number is currently available, the Patient Request Simulator is used to imitate patient interactions. No live WhatsApp number or account is required for the initial iteration.
+4. **WhatsApp is a later phase:** WhatsApp integration will be added only after the staff workflow and booking rules are proven.
+5. **Supabase is deferred:** Supabase (or PostgreSQL) will be introduced only after pilot validation when concurrency, scaling, or production WhatsApp traffic justifies it.
+6. **Excel is temporary:** Excel is a temporary pilot storage mechanism, never the final production database.
+7. **Single clinic pilot:** Start with one dental clinic and one controlled workbook (`clinic_data.xlsx`).
+8. **Administrative only:** The system is purely administrative. It must never provide clinical advice, medical diagnoses, triage, or prescriptions.
 
 ## 2. Excel Pilot Rules
 
-1. The FastAPI backend is the only writer to the workbook.
-2. Staff must not manually edit the workbook while the website is running.
-3. Every workbook write must use a file lock.
-4. Write to a temporary file, validate it, then atomically replace the main workbook.
-5. Create a backup before important writes.
-6. Keep one workbook per clinic.
-7. Never use names as primary identifiers.
-8. Keep stable identifiers across workbook-to-Supabase migration.
-9. Validate required sheets, headers, field types, and controlled status values.
-10. Store the workbook only on persistent, access-controlled storage.
-11. Never place passwords or API secrets in Excel.
-12. If the workbook cannot be safely written, do not claim that the operation succeeded.
+1. **FastAPI is the sole writer:** FastAPI is the only process permitted to read and write the Excel workbook. The staff browser and simulator must never access the workbook directly.
+2. **No concurrent manual editing:** Staff may inspect or export the workbook, but manual edits while the backend is running are strictly forbidden.
+3. **Mandatory file locking:** Every read and write operation must acquire an OS-level file lock (`clinic_data.xlsx.lock`).
+4. **Lock-once-delegate pattern:** Public repository methods acquire the workbook lock once and delegate to private `_unlocked` methods. Re-entrant lock acquisitions that cause deadlocks are forbidden.
+5. **Atomic writes:** Writes must be performed to a temporary file (`.tmp`), validated for schema integrity, and atomically moved into place using `os.replace()`.
+6. **Automated pre-write backups:** Before applying modifications, create a timestamped backup copy in the `backups/` directory.
+7. **Stable identifiers:** All records must use deterministic, sequenced IDs (`PAT-000001`, `APT-000001`, `DOC-000001`, `VIS-000001`). Patient names or row numbers must never be used as primary keys.
+8. **Persistent storage requirement:** In hosted or containerized environments, the workbook directory must be mounted to persistent storage, never ephemeral filesystems.
+9. **No secrets in Excel:** API keys, passwords, and sensitive system secrets must never be stored in the workbook.
 
 ## 3. Data Scope Rules
 
-1. Collect only information required for registration, appointment operations, and a concise previous-visit record.
-2. The initial patient fields are name, age or date of birth, phone number, optional email, identifier, and required clinic acknowledgements.
-3. Previous visits must be structured summaries, not an unbounded medical-record replacement.
-4. Explain why a new patient field is needed before adding it.
-5. Use stable patient, visit, dentist, and appointment identifiers.
-6. Do not use patient data for unrelated analytics or AI training.
-7. Do not use real patient data in development or test environments.
+1. **Minimal data collection:** Collect only fields strictly necessary for registration and appointment booking: full name, age or date of birth, phone number, optional email, and clinic consent.
+2. **Structured visit summaries:** Previous visits must be recorded as concise, structured summaries (date, dentist, visit type, short administrative note). Never attempt to implement an unbounded medical record system.
+3. **Duplicate patient detection:** When registering a patient with an existing phone number or name, trigger a review step rather than silently creating duplicate records.
+4. **No real patient data in development:** Use only synthetic or anonymized test data during development and automated testing.
 
-## 4. Scheduling Rules
+## 4. Scheduling & Single Booking Engine Rules
 
-1. FastAPI appointment services are the only authority for availability and booking.
-2. The website must re-check availability immediately before saving.
-3. Dentist availability must consider working hours, leave, breaks, existing appointments, appointment duration, and clinic timezone.
-4. A confirmed appointment must contain patient, dentist, date, start time, end time, and status.
-5. A booking must not be confirmed if the workbook write fails.
-6. A reschedule must preserve the old appointment until the new range is successfully secured.
-7. Cancellation and rescheduling must create history and audit events.
-8. Concurrent requests must be serialized through the workbook lock during the pilot.
-9. If two or three dentists are available, the selected dentist must be shown before confirmation.
-10. Never let a future WhatsApp flow use different booking rules from the website.
+1. **One booking authority:** All appointment requests—whether from the staff website, the Patient Request Simulator, or future WhatsApp webhooks—must pass through the identical FastAPI domain services (`AvailabilityService` and `AppointmentService`).
+2. **Zero duplicate booking logic:** Never write separate availability or reservation logic for the simulator or WhatsApp.
+3. **Deterministic slot calculation:** Availability must be derived by subtracting dentist non-working hours, break intervals, registered leaves/blocked dates, and existing confirmed appointments in a single workbook read.
+4. **Immediate availability re-check:** When booking an appointment, re-validate slot availability under an exclusive write lock immediately before persisting the record to prevent race conditions.
+5. **Atomic rescheduling:** During an appointment reschedule, preserve the original appointment until the replacement slot has been validated and committed.
+6. **Audit trail:** Every creation, rescheduling, and cancellation must append a corresponding entry to the `AuditLog` sheet.
 
-## 5. Website Rules
+## 5. Website & Simulator Rules
 
-1. The website is for authorized clinic staff.
-2. The browser must communicate only with FastAPI, never directly with the workbook.
-3. Staff should see clear forms, patient search, previous visits, availability, and appointments.
-4. Raw workbook structure should not be the main user experience.
-5. Show save success only after the backend confirms the write.
-6. Make errors understandable and actionable.
-7. Log out or expire sessions safely.
-8. Staff permissions must be explicit.
+1. **Authenticated staff access:** The staff website requires authentication before viewing or modifying clinic data.
+2. **Clear appointment states:** Display explicit appointment statuses (`confirmed`, `pending`, `cancelled`, `rescheduled`, `completed`, `no_show`).
+3. **Actionable error messages:** If an operation fails (e.g., workbook lock timeout or write error), present an understandable error message to staff and preserve entered form data for retry.
+4. **Simulator separation:** The Patient Request Simulator must operate as a distinct test interface that sends standard HTTP requests to FastAPI, mirroring the future WhatsApp adapter payload.
 
-## 6. WhatsApp Rules for the Later Phase
+## 6. WhatsApp Rules for Future Phase (Phase 9)
 
-1. Use the official WhatsApp Business Platform or an approved provider.
-2. Do not build the product by automating a personal WhatsApp account.
-3. WhatsApp must call existing backend services.
-4. WhatsApp must not write directly to Excel.
-5. Record opt-in and opt-out status.
-6. Respect message templates, service windows, pricing, and provider policy.
-7. Provide clear human escalation.
-8. Treat webhook events as repeatable and process them idempotently.
-9. Do not add WhatsApp until the staff website workflow is stable.
+1. Use only the official WhatsApp Business Platform or an approved business solution provider (BSP).
+2. Never automate personal WhatsApp accounts.
+3. The WhatsApp webhook adapter must convert incoming messages into standard internal commands and call existing domain services.
+4. WhatsApp webhooks must be processed idempotently to prevent duplicate bookings from network retries.
 
-## 7. Safety Rules
+## 7. Engineering & Architecture Rules
 
-1. The product is administrative.
-2. It must not diagnose, prescribe, or perform emergency triage.
-3. A request containing a clinical question must be referred to clinic staff.
-4. The system must not pretend to be a dentist or clinician.
-5. The system must disclose uncertainty and provide human help.
+1. Follow MVC architecture with strict separation: Routers/Controllers → Domain Services → Repositories → Data Models.
+2. Maintain clean repository boundaries so switching from Excel to Supabase requires no changes to business logic.
+3. Use Pydantic schemas for strict request validation and response serialization.
+4. Comprehensive automated testing: unit tests and integration tests must cover duplicate detection, slot calculation, conflict prevention, atomic writes, and error paths.
 
-## 8. Engineering Rules
+## 8. Documentation Synchronization Rules
 
-1. Use FastAPI with typed request and response schemas.
-2. Keep workbook access in a repository module.
-3. Keep booking and availability rules in domain services.
-4. Use database or file migrations where appropriate.
-5. Write tests for duplicate patients, conflicts, concurrent booking, failed writes, and permissions.
-6. Keep future Supabase integration behind a storage interface.
-7. Do not introduce microservices before there is a demonstrated need.
-8. Keep secrets outside source code and workbooks.
-9. Do not claim work is complete without validation.
-10. Report limitations honestly.
-
-## 9. Agent Documentation Rules
-
-1. Read all project Markdown files before a material change.
-2. Update `docs/Product Requirements Document.md` when product scope or requirements change.
-3. Update `docs/System Architecture.md` when components, storage, data flow, or deployment change.
-4. Update `docs/Product Design Specification.md` when workflows, screens, language, or accessibility change.
-5. Update `docs/Implementation Phases.md` when implementation order or release gates change.
-6. Update `docs/Project Memory.md` when a decision, risk, current stage, or unresolved question changes.
-7. Update `docs/Agent.md` only when the project operating process changes.
-8. Keep all documents consistent; do not leave the old WhatsApp-first assumptions in one file after the scope changes.
-
-## 10. Definition of Done
-
-A feature is done only when its requirement is clear, its scope is approved, its data impact is understood, its permissions are implemented, its failure path is handled, relevant tests pass, the user flow is reviewed, and the affected project documents are updated.
+1. Maintain internal consistency across all documentation files using their full descriptive filenames.
+2. Every document must reflect the baseline statement:
+   > **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
+3. Update `Product Requirements Document.md` on scope or requirement changes.
+4. Update `System Architecture.md` on component, data flow, or storage changes.
+5. Update `Product Design Specification.md` on UI/UX, screen, or simulator layout changes.
+6. Update `Implementation Phases.md` on phase progression or exit gate criteria.
+7. Update `Project Memory.md` whenever durable decisions, risks, or open questions change.
+8. Update `Agent.md` whenever operating instructions change.

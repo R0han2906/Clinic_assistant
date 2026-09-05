@@ -2,107 +2,90 @@
 
 ## Purpose
 
-This file stores durable project context, approved decisions, current stage, evidence, risks, and unresolved questions. It is not a temporary task log.
+This document serves as the long-term memory for the DentalFlow project, recording approved architectural decisions, durable constraints, current progress against the 9-phase roadmap, key risks, and open questions.
+
+---
 
 ## Current Product Identity
 
-**Working name:** DentalFlow
+- **Working Name:** DentalFlow
+- **Domain:** Single-location dental clinic operations (1 primary dentist, expandable to 2–3 dentists).
+- **Core Release Baseline:**
+  > **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
+- **Initial User Interface:** Dedicated web application for clinic front-desk staff (receptionists).
+- **Initial Patient-Side Channel:** **Patient Request Simulator** (web-based test harness imitating patient appointment requests).
+- **Initial Storage Layer:** One structured Excel workbook per clinic (`clinic_data.xlsx`), managed strictly by the FastAPI backend under file locks.
+- **Future Growth:** Managed Supabase (PostgreSQL) and official WhatsApp Business Platform integration.
 
-**Domain:** Dentist-clinic staff operations.
+---
 
-**First product:** Staff website for patient registration, previous-visit summaries, dentist availability, and appointment-range booking.
+## Approved Durable Decisions
 
-**Later product input:** Patient requests through WhatsApp.
+1. **Dentist-Clinic Focus:** The application is built specifically for dental clinic workflows (patient registration, structured visit summaries, dentist schedules, slot-based booking). General hospital features are out of scope.
+2. **Website & Simulator First:** Staff ergonomics and scheduling correctness must be validated before introducing production WhatsApp infrastructure.
+3. **Absence of Dedicated WhatsApp Number:** Because no live WhatsApp business number or verified WABA currently exists, the project uses a Patient Request Simulator to prove patient-to-clinic flows.
+4. **Single Booking Engine:** Staff website bookings, simulator requests, and future WhatsApp messages all execute through the exact same FastAPI domain services (`AvailabilityService` and `AppointmentService`).
+5. **Temporary Excel Storage:** Excel pilot storage enables rapid zero-dependency prototyping, immediate manual inspection, and simple export. It is not the final database.
+6. **FastAPI Sole Writer:** Neither staff browsers nor simulator clients ever access the Excel workbook directly. FastAPI is the single point of persistence.
+7. **Safe Storage Invariants:** Strict adherence to atomic replacement via temporary files, automated pre-write backups, and OS-level file locking (`filelock`) using the lock-once-delegate pattern.
+8. **Sequenced Stable IDs:** Every entity uses immutable, formatted keys (`PAT-XXXXXX`, `APT-XXXXXX`, `DOC-XXXXXX`, `VIS-XXXXXX`) to ensure frictionless migration to SQL databases.
+9. **Deferred Supabase:** Supabase introduction is deferred until multi-user concurrency, multi-clinic scaling, or live WhatsApp traffic justifies it.
+10. **Administrative Scope Only:** The system does not diagnose, prescribe, triage emergencies, or function as a full electronic medical record (EMR).
 
-**Initial storage:** One structured Excel workbook per clinic.
+---
 
-**Deferred storage:** Supabase or another managed PostgreSQL system after workflow validation.
+## Current Implementation Status (9-Phase Roadmap)
 
-## Clarified Scope
+| Phase | Description | Status | Notes |
+|---|---|---|---|
+| **Phase 1** | Confirm Real Dental-Clinic Workflow | In Progress | Working with partner clinic patterns (1 dentist default, up to 3). |
+| **Phase 2** | Staff Website Prototype | Next Priority | UI layout designed in [Product Design Specification.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Product%20Design%20Specification.md). |
+| **Phase 3** | FastAPI & Excel Pilot Backend | **COMPLETED** | MVC architecture, 9 sheets, atomic writes, filelock, all 10 tests green. |
+| **Phase 4** | Patient Registration & Visit Workflow | Backend Ready | APIs `/api/patients` and `/api/visits` fully functional. |
+| **Phase 5** | Dentist Availability & Booking | Backend Ready | Slot calculation with working hours, breaks, and leaves complete. |
+| **Phase 6** | Build Patient Request Simulator | Planned | Test harness to imitate WhatsApp requests against FastAPI services. |
+| **Phase 7** | Controlled Clinic Pilot | Planned | 2–4 week pilot with partner clinic. |
+| **Phase 8** | Decide on Supabase Migration | Deferred | Triggered when concurrency or multiple clinics demand it. |
+| **Phase 9** | Real WhatsApp Integration | Deferred | Triggered once website workflow is stable and number is active. |
 
-For this project, “hospital” means a dentist clinic. The first customer is a clinic with mostly one dentist, with support for two or three dentists when required.
+---
 
-The clinic staff will use the website. The Excel workbook is the temporary pilot data store and can be inspected or downloaded by staff when necessary. The website, not direct workbook editing, is the normal operating interface.
+## Key Architectural Risks & Safeguards
 
-The initial patient data includes registration details such as name, age or date of birth, phone number, optional email, stable patient identifier, and structured summaries of previous visits. The system also stores dentist availability and appointment ranges.
+1. **Excel Concurrency & Corruption:**
+   - *Risk:* Multiple simultaneous requests or crashed writes corrupting `clinic_data.xlsx`.
+   - *Safeguards:* OS-level `filelock.FileLock`, atomic temp-file rename (`os.replace`), and rolling pre-write snapshots in `backups/`.
+2. **Re-entrant FileLock Deadlocks:**
+   - *Risk:* Nested method calls attempting to acquire the same non-reentrant lock.
+   - *Safeguard:* Lock-once-delegate architecture where public methods acquire the lock once and pass in-memory state to private `_unlocked` helpers.
+3. **Cloud Ephemeral Storage Loss:**
+   - *Risk:* Container restarts erasing the Excel workbook in hosted environments.
+   - *Safeguard:* Mandatory persistent volume mounting; local clinic hardware deployment during early pilot.
+4. **Duplicate Patient Records:**
+   - *Risk:* Receptionists inadvertently creating duplicate profiles for returning patients.
+   - *Safeguard:* Duplicate checking by name and phone with explicit `force_create` bypass modal.
+5. **Divergent Booking Logic:**
+   - *Risk:* Writing custom booking code for the simulator or WhatsApp that bypasses availability rules.
+   - *Safeguard:* Strict single booking engine in FastAPI domain services.
 
-## Approved Product Order
-
-1. Build the staff website.
-2. Validate registration and appointment workflows with a dentist clinic.
-3. Use Excel temporarily for controlled iterations.
-4. Improve scheduling reliability and staff usability.
-5. Migrate to Supabase only when concurrency, reliability, backups, or scale justify it.
-6. Add WhatsApp as a patient-input channel using the same backend services.
-
-## Technical Decisions
-
-- FastAPI is the initial backend.
-- The website communicates with FastAPI, never directly with Excel.
-- The workbook repository is the only writer to the Excel file.
-- Workbook writes use locking, validation, backups, and atomic replacement.
-- Stable identifiers must be used from the beginning to make migration possible.
-- Appointment availability and booking are deterministic backend services.
-- WhatsApp, when added, must call the same services as the website.
-- Supabase is not required for the first controlled iteration.
-- The first architecture is a modular monolith.
-
-## Data Boundaries
-
-The initial product must not become a complete electronic medical record. Previous visits should be concise, structured summaries. New fields require a clear purpose and review of privacy implications.
-
-Passwords and API secrets must never be stored in the workbook. Real patient data must not be used in development or test environments.
-
-## Current Stage
-
-Phase 2 (FastAPI and Excel Pilot Backend) is implemented and locally verified.
-
-**Completed:**
-- FastAPI MVC backend with all routes for patients, visits, dentists, appointments, and system health.
-- Structured 9-sheet workbook (`Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`).
-- Atomic file writes with OS-level file locking (`filelock`) and pre-write backups.
-- Lock-once-delegate repository pattern — all methods acquire the workbook lock once and use private `_unlocked` helpers internally, eliminating re-entrant deadlock.
-- Collision-free ID generation via `_next_sequence` helper.
-- Dentist schedule management (PUT per day of week) and leave management (POST leave ranges).
-- Availability slot calculation that subtracts working hours, breaks, leaves, and existing appointments in one workbook read.
-- Duplicate patient detection with `force_create` bypass workflow.
-- Full automated test suite passing (10 tests).
-- Frontend API Reference document at `docs/API Reference.md`.
-
-**Next step:** Build the staff website frontend (Phase 1 exit gate) and connect it to the running backend.
-
-## Main Risks
-
-1. Excel is not a durable multi-user production database.
-2. Workbook corruption or concurrent writes could damage clinic records.
-3. Cloud deployments may use ephemeral storage unless persistent storage is configured.
-4. Staff may need more scheduling flexibility than fixed ranges provide.
-5. Duplicate patient records may be created without a review workflow.
-6. Previous-visit information may become more clinical and sensitive than initially planned.
-7. WhatsApp may be added before the internal workflow is stable.
-8. Supabase migration may be delayed if identifiers and workbook columns are inconsistent.
+---
 
 ## Unresolved Questions
 
-- Which dental clinic will be the first design partner?
-- Which country and privacy requirements apply?
-- Are appointment ranges fixed or generated from duration rules?
-- How should existing patients be matched safely?
-- What exact previous-visit summary does the clinic need?
-- Will the pilot run locally or on persistent hosted storage?
-- When is the clinic ready to migrate from Excel to Supabase?
-- Which WhatsApp provider or Meta Cloud API path will be used later?
+1. **First Design Partner:** Which specific dental clinic will host the initial Phase 7 pilot?
+2. **Registration Fields Customization:** Does the pilot clinic require any additional administrative fields (e.g., insurance provider ID or referral source)?
+3. **Appointment Duration Standards:** Will the clinic use fixed 30-minute intervals exclusively, or variable procedure durations (e.g., 60 mins for root canals)?
+4. **Hosting Topology:** Will Phase 7 run on a dedicated local machine in the clinic reception, or on a secure hosted server with persistent volume storage?
+5. **Supabase Migration Threshold:** Exactly what volume threshold (e.g., >500 appointments or >2 concurrent receptionists) triggers the Phase 8 migration?
+6. **WhatsApp Provider Selection:** Will the clinic use the Meta Cloud API directly or an approved Business Solution Provider (e.g., Twilio, Gupshup) in Phase 9?
 
-## Evidence Standard
-
-Claims about WhatsApp capabilities, pricing, policies, data protection, or provider limits must be checked against current authoritative documentation before implementation or commercial promises.
+---
 
 ## Change History
 
-| Change | Result |
-|---|---|
-| Initial planning | Product originally considered WhatsApp-first clinic automation |
-| Revised scope | Product changed to dentist-clinic website first, Excel pilot storage, WhatsApp later, Supabase deferred |
-| Phase 2 implementation | FastAPI MVC backend built, all routes implemented, test suite passing, 9-sheet workbook schema |
-| Lock architecture fix | Re-entrant FileLock deadlocks eliminated via lock-once-delegate pattern with `_unlocked` private helpers |
-| Dentist schedule & leave | Added PUT schedule-per-day and POST leave endpoints; slot calculation now subtracts leaves automatically |
+| Date | Change Event | Detail |
+|---|---|---|
+| Initial | WhatsApp-first clinic bot | Concept considered WhatsApp as initial interface. |
+| Revision 1 | Transition to Website First | Pivoted to clinic staff website with Excel storage; deferred WhatsApp & Supabase. |
+| Revision 2 | Backend & Lock Architecture | Built complete FastAPI MVC backend; fixed filelock re-entrancy with `_unlocked` helpers; 10/10 tests green. |
+| Revision 3 | Simulator-First Integration | Added Patient Request Simulator to compensate for absence of dedicated WhatsApp number; aligned roadmap to 9 distinct phases. |

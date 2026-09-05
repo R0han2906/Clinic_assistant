@@ -2,160 +2,163 @@
 
 ## 1. Design Objective
 
-The first experience is for dental-clinic staff, not patients. The website must help a receptionist complete registration and booking tasks accurately while working under time pressure.
+The primary user experience is designed for **dental-clinic front-desk staff (receptionists)**. The website must enable a receptionist to register patients, review previous visit summaries, inspect dentist availability, and book or reschedule appointments rapidly and without errors while interacting with patients in person or on the telephone.
 
-Patients will use WhatsApp only in a later phase. The future WhatsApp flow should mirror the same internal concepts but should not determine the first website design.
+Because no dedicated business WhatsApp number is currently available, the product also includes a **Patient Request Simulator**. The simulator provides a separate, clean test harness interface that imitates the structured inputs a patient will eventually submit through WhatsApp.
+
+Core design baseline:
+> **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
+
+---
 
 ## 2. Primary Staff Workflow
 
-The main workflow should be:
+The receptionist workflow is linear, minimal, and keyboard-accessible:
 
 ```text
-Find or register patient
-        -> Review previous visits
-        -> Select dentist
-        -> Check dentist availability
-        -> Select appointment range
-        -> Confirm details
-        -> Save appointment
-        -> Show updated schedule
+[Search or Register Patient]
+           |
+           v
+[Review Previous Visits on Patient Profile]
+           |
+           v
+[Select Requested Dentist & Desired Date]
+           |
+           v
+[View Available Slot Ranges (Calculated in Real-Time)]
+           |
+           v
+[Select Slot & Review Confirmation Summary]
+           |
+           v
+[Atomic Save -> Update Daily Schedule View]
 ```
 
-The workflow should be possible from one clear patient profile and appointment context without forcing staff to navigate through unrelated screens.
+All core actions should be accessible within two clicks from the main navigation, minimizing screen transitions during phone calls.
 
-## 3. Main Website Screens
+---
 
-### Staff login
+## 3. Staff Website Screens
 
-The login screen should be simple and should not expose operational data before authentication.
+### 3.1 Authentication
+- Clean, focused login card for receptionists and dentists.
+- No operational patient data exposed prior to valid session creation.
 
-### Today dashboard
+### 3.2 Today's Schedule Dashboard
+- Default landing screen upon login.
+- Displays today's date, active dentists on duty, and a chronological timeline of scheduled appointments.
+- Status badges: `confirmed` (green), `pending` (yellow), `completed` (blue), `cancelled` (gray), `no_show` (red).
+- Quick action button: "New Appointment" and "Register Patient".
 
-The first screen after login should show today’s appointments, dentists working today, unconfirmed items, and actions requiring staff attention.
+### 3.3 Patient Search & Profile
+- Fast search bar supporting patient name, phone number, or ID (`PAT-XXXXXX`).
+- Search results card displaying name, phone, age/DOB, and last visit date.
+- Dedicated patient profile displaying:
+  - Demographic registration details.
+  - Action buttons: "Book Appointment", "Add Visit Summary", "Edit Details".
+  - Chronological list of structured previous visits.
+  - Upcoming and past appointment history.
 
-### Patient search
+### 3.4 Patient Registration Form & Duplicate Detection UX
+- Clean form divided into logical sections:
+  1. Identity: Full Name, Age or Date of Birth.
+  2. Contact: Phone Number (required), Email (optional).
+  3. Clinic Consents: Checkbox for clinic data privacy acknowledgement.
+- **Duplicate Detection Modal:** If a patient with the same phone number or similar name exists, display an immediate side-by-side comparison modal:
+  - Option A: "Select Existing Patient" (redirects to their profile).
+  - Option B: "Create Anyway" (calls `POST /api/patients?force_create=true`).
 
-Staff should be able to search by patient identifier, name, or phone number. Search results must display enough information to distinguish patients without exposing unnecessary details.
+### 3.5 Structured Previous-Visit UX
+- A concise modal or inline section on the patient profile to record:
+  - Visit Date (defaults to today).
+  - Attending Dentist (dropdown).
+  - Visit Type (dropdown: Consultation, Cleaning, Filling, Root Canal, Extraction, Follow-up).
+  - Short Summary (textarea limited to 500 characters, focusing on administrative/treatment overview).
+- Avoids dense EMR complexity; displays as clean chronological cards.
 
-### Patient profile
+### 3.6 Dentist Availability & Leave Management
+- Visual weekly calendar showing dentist working hours and lunch breaks.
+- Leave management panel: allows staff to register blocked vacation or leave dates (`POST /api/dentists/{id}/leaves`).
+- Real-time indicator showing which dentists are currently available on any chosen date.
 
-The profile should show registration information, previous visit summaries, upcoming appointments, and actions to book or modify an appointment.
+### 3.7 Appointment Booking & Slot Picker
+- Visual slot selector showing generated non-conflicting time slots (e.g., 09:00–09:30, 09:30–10:00).
+- Slots occupied by existing bookings, breaks, or dentist leaves are automatically omitted.
+- Confirmation Card before final save:
+  ```text
+  +-----------------------------------------------+
+  | Review Appointment Details                    |
+  | Patient:  John Doe (PAT-000001)               |
+  | Dentist:  Dr. Jane Smith (DOC-000001)         |
+  | Date:     Monday, 2026-09-14                  |
+  | Time:     10:00 - 10:30                       |
+  | Status:   Ready to Confirm                    |
+  |                                               |
+  | [ Cancel ]             [ Confirm & Book Slot ]|
+  +-----------------------------------------------+
+  ```
 
-### Registration form
+---
 
-The form should collect only the approved fields. Required and optional fields must be visibly different. Duplicate-looking patients should trigger a review step rather than silently creating another record.
+## 4. Patient Request Simulator UX (Phase 6)
 
-### Dentist availability
+The Patient Request Simulator is a dedicated, separate interface designed for developers, testers, and clinic managers to validate patient-side request handling.
 
-Staff should see which dentist is available, unavailable, on leave, or already booked. If two or three dentists are available, the page should make the choices explicit.
+### 4.1 Layout & Visual Differentiation
+- Distinct visual theme (e.g., mobile preview frame or conversational card layout) clearly separating it from the clinic staff dashboard.
+- Simulates the information a patient would submit over WhatsApp.
 
-### Appointment booking
+### 4.2 Simulator Input Fields
+1. **Patient Identifier / Contact:**
+   - Name ("Jane Doe")
+   - Phone Number ("+1-555-0199")
+2. **Appointment Preferences:**
+   - Preferred Dentist (Select specific dentist or "Any Available Dentist")
+   - Target Date (Date picker)
+   - Preferred Time Window (Morning, Afternoon, or specific range)
+   - Appointment Reason / Notes (e.g., "Regular checkup & cleaning")
+3. **Submit Button:** "Send Simulated Patient Request"
 
-The booking page should show patient, dentist, date, start time, end time, and appointment status before the final confirmation.
+### 4.3 Simulator Output & Verification
+- On submit, makes an HTTP POST request to the FastAPI backend.
+- Displays immediate response:
+  - **Success:** Displays confirmed booking with `APT-XXXXXX` ID, dentist name, and confirmed time slot.
+  - **Conflict / Alternatives:** Displays alternative available slot options returned by the availability service.
+- Verification banner: Informs tester that the booking has been dispatched to the clinic schedule and prompts them to verify appearance on the Staff Website.
 
-### Schedule
+---
 
-The schedule should support a daily view first. It should show dentist, patient, appointment range, and status. A weekly view may be added after staff usage proves it is needed.
+## 5. Later WhatsApp Conversational UX (Phase 9)
 
-## 4. Design Principles
-
-1. **Staff first:** Optimize for receptionists and clinic operations.
-2. **One task at a time:** Avoid presenting every configuration option on one screen.
-3. **Visible truth:** Show the current dentist availability and appointment status clearly.
-4. **Safe confirmation:** Require confirmation before saving, cancelling, or rescheduling.
-5. **Recoverable errors:** Explain what went wrong and how staff can continue.
-6. **No silent changes:** Never substitute a dentist or appointment range without showing it.
-7. **Data minimization:** Do not display clinical information where it is not needed.
-8. **Excel is invisible to normal use:** Staff use the website; the workbook is a storage and export layer.
-
-## 5. Registration UX
-
-The registration form should be divided into small sections:
-
-- Identity: name and patient identifier.
-- Contact: phone number and optional email.
-- Demographics: age or date of birth.
-- Clinic-required acknowledgement or consent.
-- Save and continue to appointment.
-
-After saving, show a clear confirmation with the patient identifier. If a possible duplicate is found, show the matching records and ask staff to choose an existing patient or confirm a new record.
-
-## 6. Previous Visit UX
-
-Previous visits should be displayed as a chronological list or table with date, dentist, visit type, and short staff-entered summary.
-
-The first version should not display an unstructured mass of sensitive notes. If a visit summary is needed, keep it short, structured, and accessible only to authorized staff.
-
-## 7. Dentist and Availability UX
-
-The availability screen should show:
-
-- Dentist name.
-- Working status.
-- Working hours.
-- Leave or blocked periods.
-- Existing appointments.
-- Available ranges.
-
-When a staff member selects a dentist, the system should show the chosen dentist prominently. If “any available dentist” is allowed, the final confirmation must still show which dentist was assigned.
-
-## 8. Appointment Confirmation
-
-Before saving, show a confirmation card:
+In Phase 9, the WhatsApp Business integration will replace the simulator using a guided chatbot flow:
 
 ```text
-Patient: [name]
-Dentist: [dentist]
-Date: [date]
-Time: [start]–[end]
-Status: Ready to confirm
+Step 1: Welcome message & clinic identification.
+Step 2: Check if new or returning patient (via phone number).
+Step 3: Ask for preferred dentist or assign first available.
+Step 4: Ask for preferred date & show available slot options.
+Step 5: Patient selects slot number (e.g., reply "1" for 10:00 AM).
+Step 6: Send official WhatsApp confirmation template.
+Step 7: Provide "Talk to Receptionist" escalation option at every step.
 ```
 
-The final action should be explicit, such as `Confirm appointment`. After saving, the interface should show the appointment identifier and status.
+---
 
-## 9. Error States
+## 6. Error States and Edge Cases
 
-| Situation | Design response |
+| Scenario | UI/UX Behavior |
 |---|---|
-| Patient not found | Offer registration without losing the current intent |
-| Possible duplicate | Show matching records and require staff confirmation |
-| Dentist unavailable | Explain why and show valid alternatives |
-| Range already booked | Refresh availability and ask staff to choose again |
-| Excel write failed | Do not show success; preserve entered information and provide retry/support action |
-| Workbook locked | Tell staff that another operation is in progress; retry safely |
-| Unknown error | Show a safe message and create a staff or admin alert |
+| **Patient Phone Already Exists** | Show comparison modal with matching record and "Force Create" override button. |
+| **Dentist on Leave** | Date picker greys out blocked dates with a "Dentist on Leave" tooltip. |
+| **Slot Booked Concurrently** | Toast notification: "This slot was just booked by another user. Here are the latest available slots." Refreshes slots automatically. |
+| **Excel File Locked** | Toast notification: "Clinic database is momentarily busy. Retrying..." Auto-retries transparently without losing entered form data. |
+| **Network Disconnection** | Offline banner warning; prevents destructive actions until connection is restored. |
 
-## 10. Visual Direction
+---
 
-Use a calm, professional interface suitable for a dental clinic. Prioritize readable typography, clear labels, high contrast, consistent spacing, restrained color, and obvious primary actions.
+## 7. Visual Design Guidelines
 
-Appointment status must be communicated with text as well as color. Avoid excessive animations, decorative dashboards, and dense charts in the first version.
-
-## 11. Later WhatsApp Design
-
-WhatsApp should ask for one decision at a time:
-
-1. New or existing patient.
-2. Patient name and required registration details.
-3. Preferred dentist or any available dentist.
-4. Preferred date or appointment range.
-5. Available options.
-6. Confirmation.
-7. Human-support option.
-
-The WhatsApp flow must not expose the Excel workbook or internal identifiers unnecessarily. It should send structured information to the backend and show the patient an understandable confirmation.
-
-## 12. Usability Testing
-
-Test with real clinic staff using realistic tasks:
-
-- Register a new patient.
-- Find an existing patient.
-- Review a previous visit.
-- Identify the available dentist.
-- Book a range.
-- Cancel and reschedule.
-- Recover from a failed write.
-- Find today’s appointments.
-
-A design is acceptable when staff can complete the core tasks accurately without developer explanation.
+- **Palette:** Clean, medical-grade aesthetic. Crisp whites, deep slate text (`#1e293b`), and trustworthy clinic blues (`#2563eb` primary, `#0284c7` accent).
+- **Typography:** Modern, legible sans-serif (e.g., Inter or Outfit) with clear hierarchy and high contrast ratios conforming to WCAG AA.
+- **Feedback:** Clear toast notifications and loading spinners for all asynchronous actions.
+- **Accessibility:** Full keyboard navigability (`Tab`, `Enter`, `Esc` for modals), clear ARIA labels, and explicit focus rings.

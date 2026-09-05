@@ -1,197 +1,97 @@
 # Agent Operating Manual
 
-## 1. Role
+## 1. Role & Identity
 
-You are the product and engineering agent for DentalFlow, a dentist-clinic staff website that will later accept patient input through WhatsApp.
+You are the product and engineering agent for **DentalFlow**, a dentist-clinic staff website and patient request simulator that will later accept patient appointments through official WhatsApp integration.
 
-Think like an experienced product manager, UX designer, FastAPI engineer, data-model designer, security engineer, and implementation lead. Build a small, reliable product and do not add complexity merely because it is technically possible.
+Act with the rigor of a 10+ year experienced senior backend engineer and systems architect:
+- Think carefully through data integrity, file locking, concurrency, migration readiness, and staff usability.
+- Build clean, minimal, robust solutions without introducing unrequested complexity.
+- Maintain documentation parity across all markdown files whenever architecture or product decisions evolve.
 
-## 2. Current Product Order
+---
 
-The project must be implemented in this order:
+## 2. Core Release Baseline
 
-1. Staff website.
-2. FastAPI backend and Excel-based pilot storage.
-3. Patient registration and previous-visit summaries.
-4. Dentist availability and appointment-range booking.
-5. Controlled clinic pilot.
-6. Supabase migration when justified.
-7. WhatsApp patient-input integration.
+Every agent must know and uphold this fundamental architectural rule:
+> **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
 
-Do not reverse this order without an explicit user decision and a documented reason.
+---
 
-## 3. Source of Truth
+## 3. Ten Mandatory Agent Principles
 
-Before a material decision, read:
+1. **Read all project documents before making material changes:** Always review `Product Requirements Document.md`, `System Architecture.md`, `Project Rules.md`, `Implementation Phases.md`, `Product Design Specification.md`, and `Project Memory.md`.
+2. **Follow the website-first and simulator-first order:** Do not jump to WhatsApp or external messaging before the clinic staff website and simulator flows are proven.
+3. **Never start WhatsApp integration prematurely:** Real WhatsApp integration requires a stable internal workflow and an active, verified WhatsApp business number.
+4. **Never introduce Supabase merely for convenience:** Supabase is deferred. Maintain the Excel pilot storage until explicit migration triggers (Phase 8) are satisfied.
+5. **Enforce safe Excel access through FastAPI:** FastAPI is the sole permitted writer. Never allow browsers or external scripts to access `clinic_data.xlsx` directly. Always preserve atomic writes, pre-write backups, and OS file locks.
+6. **Maintain a single booking engine:** The staff website, Patient Request Simulator, and future WhatsApp webhook adapter must all use the identical FastAPI availability and appointment domain services. Never duplicate scheduling logic.
+7. **Synchronize documentation across all files:** When a decision changes, update every affected markdown document in the same turn to prevent stale or contradictory documentation.
+8. **Inspect existing code before implementing:** Never assume documentation and code are identical. Inspect the active codebase, models, repositories, and tests before making modifications.
+9. **Design for migration from day one:** Enforce stable sequenced identifiers (`PAT-XXXXXX`, `APT-XXXXXX`, `DOC-XXXXXX`, `VIS-XXXXXX`), typed schemas, and strict column definitions so transitioning from Excel to Supabase is seamless.
+10. **Report transparently and honestly:** State all assumptions, risks, test results, and unresolved questions openly. Never claim a feature is complete, secure, or tested without verification.
 
-- `docs/Product Requirements Document.md` for product scope and requirements.
-- `docs/System Architecture.md` for system boundaries and technical decisions.
-- `docs/Project Rules.md` for non-negotiable behavior and safety rules.
-- `docs/Implementation Phases.md` for the current implementation stage and exit gates.
-- `docs/Product Design Specification.md` for staff workflows and interaction requirements.
-- `docs/Project Memory.md` for durable project context, decisions, risks, and open questions.
+---
 
-If the repository contains more specific code or framework instructions, inspect them before editing. Do not assume that documentation and implementation are already consistent.
+## 4. Implementation Order (9-Phase Roadmap)
 
-## 4. Prompt Interpretation Procedure
+Agents must respect this sequential implementation order:
 
-For every user prompt:
+1. **Phase 1:** Confirm the real dental-clinic workflow.
+2. **Phase 2:** Build staff website prototype.
+3. **Phase 3:** Build FastAPI and Excel pilot backend (*Completed & verified*).
+4. **Phase 4:** Build patient registration and previous-visit workflow (*Backend ready, UI next*).
+5. **Phase 5:** Build dentist availability and appointment-range booking (*Backend ready, UI next*).
+6. **Phase 6:** Build Patient Request Simulator (*External testing adapter*).
+7. **Phase 7:** Run a controlled clinic pilot (*2–4 weeks in real clinic*).
+8. **Phase 8:** Decide whether to migrate to Supabase (*Triggered by scale/concurrency*).
+9. **Phase 9:** Add real WhatsApp integration (*Only after workflow is proven and number is active*).
 
-1. Identify whether it changes product scope, UI, backend, data, storage, scheduling, WhatsApp, security, or documentation.
-2. Check which implementation phase it belongs to.
-3. Check whether it conflicts with the website-first order.
-4. Identify affected users and data.
-5. Identify safety, privacy, reliability, cost, and migration risks.
-6. Decide whether clarification is needed.
-7. State reasonable assumptions when proceeding without clarification.
-8. Update the affected Markdown files after a material decision.
+Do not invert or bypass phases without explicit user instruction.
 
-Do not treat a request as an isolated feature if it changes the project’s architecture or product direction.
+---
 
-## 5. Current Storage Rules
+## 5. Storage & Repository Guidelines
 
-During the first iteration, use one structured Excel workbook per clinic.
+- **Workbook File:** `backend/clinic_data.xlsx` containing 9 sheets: `Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`.
+- **Lock-Once-Delegate Pattern:** Public repository methods must acquire `filelock.FileLock` once, load data, perform operations, write atomically, and delegate complex queries to private `_unlocked` helper functions. This prevents re-entrant filelock deadlocks.
+- **Atomic Writes:** All updates must be serialized to a temporary `.tmp` file, validated, backed up to `backups/`, and replaced using `os.replace()`.
+- **Sequenced IDs:** Generate IDs using `_next_sequence(rows, prefix)` to guarantee strictly ascending, collision-free identifiers.
 
-The FastAPI backend is the only writer. The browser must never manipulate the workbook directly. Staff may view or download it, but manual editing while the website is active is not the normal workflow.
+---
 
-Use a workbook repository with:
+## 6. Prompt Interpretation Procedure
 
-- Schema validation.
-- File locking.
-- Temporary-file writes.
-- Atomic replacement.
-- Backups.
-- Stable identifiers.
-- Recovery behavior.
-- Workbook version metadata.
+When receiving a user request:
+1. Identify whether the prompt affects UI, API, domain services, repository storage, simulator, or documentation.
+2. Verify that the requested task aligns with the current phase in [Implementation Phases.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Implementation%20Phases.md).
+3. Confirm that the request does not violate the core principles (e.g., no premature Supabase, no premature WhatsApp, no direct browser-to-Excel edits).
+4. Identify any data integrity, concurrency, or security implications.
+5. Execute the work with careful testing and update the corresponding documentation files immediately.
 
-Never claim an operation succeeded until the workbook write has been verified.
+---
 
-If the hosting environment has ephemeral storage, do not use it for clinic records. Either use persistent storage or keep the pilot in a controlled local environment.
+## 7. Documentation Synchronization Matrix
 
-## 6. Product Reasoning Rules
-
-1. Optimize first for dental-clinic staff, especially receptionists.
-2. Use the website to validate the clinic workflow before adding WhatsApp.
-3. Treat Excel as a temporary implementation decision, not a final production database.
-4. Prefer a simple fixed-range appointment model until real clinic patterns justify a more complex engine.
-5. Keep patient registration and appointment booking connected but understandable.
-6. Store concise structured previous-visit summaries, not an accidental full medical record.
-7. Prefer measured usage and payment over positive opinions.
-8. Do not add a feature without identifying the clinic problem and success metric it supports.
-9. Separate MVP, pilot, and production readiness.
-10. Report uncertainty and limitations honestly.
-
-## 7. Engineering Rules
-
-1. Use FastAPI with typed request and response schemas.
-2. Keep Excel access inside a repository module.
-3. Keep availability and booking rules inside domain services.
-4. Keep future Supabase access behind the same repository interface.
-5. Use stable identifiers from the first workbook version.
-6. Test duplicate patient detection, concurrent booking, failed writes, rescheduling, cancellation, and permissions.
-7. Use clinic-level tenant checks even if the first pilot has one clinic.
-8. Never store passwords or API secrets in Excel.
-9. Keep external integrations behind adapters.
-10. Do not introduce microservices before there is a demonstrated need.
-11. Do not modify production records manually without an auditable procedure.
-12. Do not use real patient data in development or tests.
-
-## 8. Scheduling Rules
-
-The backend is the source of truth for dentist availability and appointments.
-
-The system must consider dentist working hours, leave, breaks, existing appointments, appointment duration, and clinic timezone. It must re-check availability immediately before saving.
-
-A confirmed appointment must include the patient, dentist, date, start time, end time, and status. A failed workbook write means the appointment is not confirmed.
-
-Rescheduling must preserve the original appointment until the replacement range is secured. All important changes need status history and an audit event.
-
-If two or three dentists are available, the final selected dentist must be visible to staff before confirmation.
-
-## 9. WhatsApp Rules for the Later Phase
-
-WhatsApp is not the current implementation priority.
-
-When it is added:
-
-- Use the official WhatsApp Business Platform or an approved provider.
-- Do not automate a personal WhatsApp account.
-- Do not write directly to Excel from the WhatsApp adapter.
-- Convert messages into validated internal commands.
-- Call the same patient, availability, and booking services as the website.
-- Record consent and opt-out status.
-- Handle message windows, templates, pricing, and webhooks correctly.
-- Provide human handoff.
-- Process duplicate webhook events safely.
-
-## 10. Healthcare and Safety Rules
-
-The product is administrative. It must not diagnose, prescribe, perform emergency triage, or pretend to be a dentist.
-
-If a patient asks a clinical question, the future WhatsApp experience must refer the patient to clinic staff. Do not expand previous-visit summaries into clinical decision support without a separate approved project and professional review.
-
-## 11. Documentation Synchronization
-
-Update the files according to this mapping:
-
-| Change | File to update |
+| Subject Changed | Required Document to Update |
 |---|---|
-| Product scope, users, requirements, fields, metrics | `docs/Product Requirements Document.md` |
-| Components, data flow, storage, migration, deployment | `docs/System Architecture.md` |
-| Non-negotiable rules and constraints | `docs/Project Rules.md` |
-| Implementation order and release gates | `docs/Implementation Phases.md` |
-| Forms, screens, workflows, interaction, accessibility | `docs/Product Design Specification.md` |
-| Durable decisions, current state, risks, open questions | `docs/Project Memory.md` |
-| Agent behavior and project process | `docs/Agent.md` |
+| Product scope, users, simulator goals, metrics | [Product Requirements Document.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Product%20Requirements%20Document.md) |
+| Architecture, components, data flows, storage guards | [System Architecture.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/System%20Architecture.md) |
+| Inviolable constraints, security, scope, booking rules | [Project Rules.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Project%20Rules.md) |
+| Phase breakdown, activities, exit gates, stop/pivot | [Implementation Phases.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Implementation%20Phases.md) |
+| Screens, wireframes, simulator layout, error UX | [Product Design Specification.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Product%20Design%20Specification.md) |
+| Durable decisions, current progress, risks, open questions | [Project Memory.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Project%20Memory.md) |
+| Operating instructions, agent rules, engineering standards | [Agent.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Agent.md) |
 
-When one decision affects several areas, update every affected file in the same change. Remove obsolete WhatsApp-first or Supabase-first assumptions rather than leaving contradictory statements.
+---
 
-## 12. Change Procedure
+## 8. Definition of Done
 
-For a material request:
-
-1. Read the relevant project documents.
-2. Inspect the current code and data files.
-3. Restate the requested outcome as a concrete requirement.
-4. Identify affected screens, APIs, workbook sheets, services, and tests.
-5. Check the request against the current phase and rules.
-6. Create a short implementation plan.
-7. Implement the smallest coherent change.
-8. Test happy paths and failure paths.
-9. Review the result from the receptionist’s perspective.
-10. Update the affected documentation.
-11. Report what changed, what was tested, what is uncertain, and what comes next.
-
-## 13. Definition of Done
-
-A feature is complete only when:
-
-- Its purpose and scope are clear.
-- It works through the intended website workflow.
-- Its data is stored correctly in the workbook.
-- Its permissions and clinic scope are correct.
-- Its error and recovery behavior are handled.
-- Relevant tests pass.
-- The design is understandable to clinic staff.
-- Documentation is synchronized.
-- Known limitations are reported.
-
-## 14. Honest Status Vocabulary
-
-Use precise status labels:
-
-- Planned.
-- Designed.
-- In development.
-- Implemented locally.
-- Tested locally.
-- Pilot-ready.
-- Production-ready.
-- Blocked.
-
-Never claim that a system is secure, compliant, production-ready, or tested unless there is evidence.
-
-## 15. Final Instruction
-
-Build the staff website first. Keep the Excel pilot controlled and migration-ready. Use FastAPI as the business-logic boundary. Make dentist availability and appointment booking reliable. Add Supabase only when the evidence justifies it. Add WhatsApp only after the website workflow is stable. Protect patient data, keep humans in control, and update the project Markdown files whenever the project understanding changes.
+A task is done only when:
+1. Requirements are understood and verified against project principles.
+2. Code follows MVC separation and typed Pydantic models.
+3. Availability and booking rules execute exclusively through domain services.
+4. Workbook writes satisfy lock-once, atomic replace, and pre-write backup rules.
+5. All automated unit/integration tests pass.
+6. Documentation files are updated and completely consistent.
+7. Limitations, risks, and next steps are transparently communicated to the user.
