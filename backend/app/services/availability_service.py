@@ -12,9 +12,11 @@ class AvailabilityService:
 
     def calculate_available_slots(
         self,
-        target_date_str: str,
+        target_date_str: Optional[str] = None,
         dentist_id: Optional[str] = None,
-        slot_duration_minutes: int = 30
+        slot_duration_minutes: int = 30,
+        *,
+        date_str: Optional[str] = None
     ) -> List[AvailableSlot]:
         """
         Calculates all available appointment slots for a given date.
@@ -23,6 +25,7 @@ class AvailabilityService:
         Does a single workbook read if the repository is ExcelClinicRepository,
         otherwise falls back to separate public method calls.
         """
+        target_date_str = target_date_str or date_str or ""
         try:
             target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
         except ValueError:

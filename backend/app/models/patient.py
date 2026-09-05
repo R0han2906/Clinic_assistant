@@ -8,6 +8,10 @@ class PatientBase(BaseModel):
     phone: str = Field(..., min_length=7, description="Primary contact phone number")
     email: Optional[str] = Field(None, description="Optional contact email")
     emergency_contact: Optional[str] = Field(None, description="Optional emergency contact name/phone")
+    gender: Optional[str] = Field(None, description="Gender: Male, Female, Other")
+    address: Optional[str] = Field(None, description="Full residential street address")
+    allergies: Optional[str] = Field(None, description="Known drug or material allergies e.g. Penicillin, Latex")
+    medical_conditions: Optional[str] = Field(None, description="Known systemic conditions e.g. Heart Disease, Hepatitis")
     consent_status: str = Field("acknowledged", description="Clinic policy acknowledgement status")
 
 class PatientCreate(PatientBase):

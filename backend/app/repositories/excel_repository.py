@@ -1,4 +1,5 @@
 import os
+import json
 import shutil
 from pathlib import Path
 from datetime import datetime
@@ -16,14 +17,26 @@ from app.models.patient import PatientResponse, PatientCreate
 from app.models.visit import VisitResponse, VisitCreate
 from app.models.dentist import DentistResponse, DentistCreate
 from app.models.availability import WorkingScheduleItem, LeaveItem, LeaveCreate, ScheduleUpdate
-from app.models.appointment import AppointmentResponse, AppointmentCreate, AppointmentStatus
+from app.models.appointment import (
+    AppointmentResponse, AppointmentCreate, AppointmentStatus,
+    PaymentReminderResponse
+)
 from app.models.audit import AuditLogEntry
+from app.models.treatment import Treatment
+from app.models.medical_checkup import (
+    MedicalCheckupCreate, MedicalCheckupResponse, ToothFinding
+)
+from app.models.patient_request import (
+    PatientRequestCreate, PatientRequestResponse, PatientRequestStatus
+)
 from app.repositories.base import BaseClinicRepository
 from app.repositories.excel_schema import (
     ALL_SHEETS, SHEET_COLUMNS,
     SHEET_PATIENTS, SHEET_VISITS, SHEET_DENTISTS, SHEET_AVAILABILITY,
     SHEET_LEAVES, SHEET_APPOINTMENTS, SHEET_STAFF, SHEET_AUDIT, SHEET_METADATA,
-    DEFAULT_DENTISTS, DEFAULT_AVAILABILITY, DEFAULT_METADATA
+    SHEET_CHECKUPS, SHEET_TREATMENTS, SHEET_PATIENT_REQUESTS,
+    DEFAULT_DENTISTS, DEFAULT_AVAILABILITY, DEFAULT_METADATA,
+    DEFAULT_TREATMENTS
 )
 
 
@@ -263,6 +276,10 @@ class ExcelClinicRepository(BaseClinicRepository):
                 phone=r.get("phone", ""),
                 email=r.get("email") or None,
                 emergency_contact=r.get("emergency_contact") or None,
+                gender=r.get("gender") or None,
+                address=r.get("address") or None,
+                allergies=r.get("allergies") or None,
+                medical_conditions=r.get("medical_conditions") or None,
                 consent_status=r.get("consent_status", "acknowledged"),
                 created_at=r.get("created_at", ""),
                 updated_at=r.get("updated_at", "")
@@ -314,6 +331,10 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "phone": patient_data.phone,
                 "email": patient_data.email or "",
                 "emergency_contact": patient_data.emergency_contact or "",
+                "gender": patient_data.gender or "",
+                "address": patient_data.address or "",
+                "allergies": patient_data.allergies or "",
+                "medical_conditions": patient_data.medical_conditions or "",
                 "consent_status": patient_data.consent_status,
                 "created_at": now_iso,
                 "updated_at": now_iso
@@ -342,6 +363,10 @@ class ExcelClinicRepository(BaseClinicRepository):
             phone=patient_data.phone,
             email=patient_data.email,
             emergency_contact=patient_data.emergency_contact,
+            gender=patient_data.gender,
+            address=patient_data.address,
+            allergies=patient_data.allergies,
+            medical_conditions=patient_data.medical_conditions,
             consent_status=patient_data.consent_status,
             created_at=now_iso,
             updated_at=now_iso
@@ -374,6 +399,10 @@ class ExcelClinicRepository(BaseClinicRepository):
             phone=target["phone"],
             email=target.get("email") or None,
             emergency_contact=target.get("emergency_contact") or None,
+            gender=target.get("gender") or None,
+            address=target.get("address") or None,
+            allergies=target.get("allergies") or None,
+            medical_conditions=target.get("medical_conditions") or None,
             consent_status=target.get("consent_status", "acknowledged"),
             created_at=target["created_at"],
             updated_at=target["updated_at"]
@@ -742,6 +771,12 @@ class ExcelClinicRepository(BaseClinicRepository):
                 continue
 
             p_info = patients_map.get(r.get("patient_id", ""), {})
+            raw_status = r.get("status", "confirmed").lower()
+            try:
+                apt_status = AppointmentStatus(raw_status)
+            except ValueError:
+                apt_status = AppointmentStatus.CONFIRMED
+
             results.append(AppointmentResponse(
                 appointment_id=r.get("appointment_id", ""),
                 patient_id=r.get("patient_id", ""),
@@ -752,7 +787,12 @@ class ExcelClinicRepository(BaseClinicRepository):
                 date=r.get("date", ""),
                 start_time=r.get("start_time", ""),
                 end_time=r.get("end_time", ""),
-                status=AppointmentStatus(r.get("status", "confirmed").lower()),
+                treatment_name=r.get("treatment_name") or "General Checkup",
+                source=r.get("source") or "MANUAL APPOINTMENT",
+                payment_status=r.get("payment_status") or "UNPAID",
+                bill_number=r.get("bill_number") or None,
+                clinical_notes=r.get("clinical_notes") or None,
+                status=apt_status,
                 reason=r.get("reason") or None,
                 notes=r.get("notes") or None,
                 created_at=r.get("created_at", ""),
@@ -786,7 +826,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 if (
                     r.get("dentist_id", "").lower() == appointment_data.dentist_id.lower()
                     and r.get("date") == appointment_data.date
-                    and r.get("status", "").lower() in ["confirmed", "pending"]
+                    and r.get("status", "").lower() in ["confirmed", "pending", "registered"]
                 ):
                     existing_start = r.get("start_time", "")
                     existing_end = r.get("end_time", "")
@@ -802,6 +842,8 @@ class ExcelClinicRepository(BaseClinicRepository):
             seq = self._next_sequence(apt_rows, "appointment_id")
             apt_id = f"APT-{seq:06d}"
             now_iso = datetime.now().isoformat()
+            treatment = appointment_data.treatment_name or "General Checkup"
+            bill_ref = appointment_data.bill_number or f"Bill #{10100 + seq}"
 
             new_row = {
                 "appointment_id": apt_id,
@@ -810,6 +852,11 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "date": appointment_data.date,
                 "start_time": appointment_data.start_time,
                 "end_time": appointment_data.end_time,
+                "treatment_name": treatment,
+                "source": appointment_data.source or "MANUAL APPOINTMENT",
+                "payment_status": appointment_data.payment_status or "UNPAID",
+                "bill_number": bill_ref,
+                "clinical_notes": appointment_data.clinical_notes or "",
                 "status": "confirmed",
                 "reason": appointment_data.reason or "",
                 "notes": appointment_data.notes or "",
@@ -828,7 +875,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "entity_id": apt_id,
                 "action": "CREATE",
                 "details": (
-                    f"Booked for patient {appointment_data.patient_id} "
+                    f"Booked {treatment} for patient {appointment_data.patient_id} "
                     f"with dentist {appointment_data.dentist_id} "
                     f"on {appointment_data.date} "
                     f"({appointment_data.start_time}-{appointment_data.end_time})"
@@ -849,6 +896,11 @@ class ExcelClinicRepository(BaseClinicRepository):
             date=appointment_data.date,
             start_time=appointment_data.start_time,
             end_time=appointment_data.end_time,
+            treatment_name=treatment,
+            source=appointment_data.source or "MANUAL APPOINTMENT",
+            payment_status=appointment_data.payment_status or "UNPAID",
+            bill_number=bill_ref,
+            clinical_notes=appointment_data.clinical_notes,
             status=AppointmentStatus.CONFIRMED,
             reason=appointment_data.reason,
             notes=appointment_data.notes,
@@ -995,3 +1047,382 @@ class ExcelClinicRepository(BaseClinicRepository):
             })
             all_data[SHEET_AUDIT] = audit_rows
             self._write_all_sheets(all_data)
+
+    # =========================================================================
+    # TREATMENTS CATALOG
+    # =========================================================================
+
+    def list_treatments(self) -> List[Treatment]:
+        return [Treatment(**t) for t in DEFAULT_TREATMENTS]
+
+    # =========================================================================
+    # BILLING & PAYMENT REMINDERS
+    # =========================================================================
+
+    def update_payment_status(
+        self,
+        appointment_id: str,
+        payment_status: str,
+        bill_number: Optional[str] = None
+    ) -> Optional[AppointmentResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            apt_rows = all_data.get(SHEET_APPOINTMENTS, [])
+            target = None
+            for r in apt_rows:
+                if r.get("appointment_id", "").lower() == appointment_id.lower():
+                    target = r
+                    break
+            if not target:
+                return None
+
+            now_iso = datetime.now().isoformat()
+            target["payment_status"] = payment_status
+            if bill_number:
+                target["bill_number"] = bill_number
+            target["updated_at"] = now_iso
+
+            audit_rows = all_data.get(SHEET_AUDIT, [])
+            audit_rows.append({
+                "log_id": f"LOG-{self._next_sequence(audit_rows, 'log_id'):06d}",
+                "timestamp": now_iso,
+                "staff_id": "staff_reception",
+                "entity_type": "APPOINTMENT",
+                "entity_id": appointment_id,
+                "action": "PAYMENT_UPDATE",
+                "details": f"Updated payment status to {payment_status} (Bill: {target.get('bill_number', '')})"
+            })
+            all_data[SHEET_AUDIT] = audit_rows
+            self._write_all_sheets(all_data)
+
+            return self._get_appointment_unlocked(all_data, appointment_id)
+
+    def send_payment_reminder(self, appointment_id: str) -> Optional[PaymentReminderResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            apt = self._get_appointment_unlocked(all_data, appointment_id)
+            if not apt:
+                return None
+
+            now_iso = datetime.now().isoformat()
+            audit_rows = all_data.get(SHEET_AUDIT, [])
+            audit_rows.append({
+                "log_id": f"LOG-{self._next_sequence(audit_rows, 'log_id'):06d}",
+                "timestamp": now_iso,
+                "staff_id": "staff_reception",
+                "entity_type": "APPOINTMENT",
+                "entity_id": appointment_id,
+                "action": "SEND_REMINDER",
+                "details": f"Payment reminder triggered for patient {apt.patient_id} ({apt.bill_number or 'Unbilled'})"
+            })
+            all_data[SHEET_AUDIT] = audit_rows
+            self._write_all_sheets(all_data)
+
+        patient_name = apt.patient_name or "Patient"
+        bill_ref = apt.bill_number or "Pending Bill"
+        msg = f"Dear {patient_name}, reminder from SmileCare Dental: your payment for {apt.treatment_name or 'procedure'} ({bill_ref}) is pending. Please contact the front desk."
+
+        return PaymentReminderResponse(
+            appointment_id=apt.appointment_id,
+            patient_id=apt.patient_id,
+            patient_name=apt.patient_name,
+            patient_phone=apt.patient_phone,
+            bill_number=apt.bill_number,
+            amount_or_status=apt.payment_status or "UNPAID",
+            reminder_sent_at=now_iso,
+            channel="SMS/WhatsApp Simulator",
+            message=msg
+        )
+
+    # =========================================================================
+    # MEDICAL CHECKUP & ODONTOGRAM
+    # =========================================================================
+
+    def _deserialize_checkup_row(self, r: Dict[str, Any]) -> MedicalCheckupResponse:
+        findings_raw = r.get("teeth_findings_json", "")
+        teeth_findings = []
+        if findings_raw:
+            try:
+                parsed = json.loads(findings_raw)
+                teeth_findings = [ToothFinding(**item) for item in parsed]
+            except Exception:
+                teeth_findings = []
+
+        conditions_raw = r.get("medical_conditions", "")
+        medical_conditions = []
+        if conditions_raw:
+            try:
+                medical_conditions = json.loads(conditions_raw)
+            except Exception:
+                medical_conditions = [c.strip() for c in conditions_raw.split(",") if c.strip()]
+
+        canker_bool = str(r.get("canker_sores", "FALSE")).upper() in ["TRUE", "1", "YES"]
+        anomalous_bool = str(r.get("anomalous_teeth", "FALSE")).upper() in ["TRUE", "1", "YES"]
+
+        return MedicalCheckupResponse(
+            checkup_id=r.get("checkup_id", ""),
+            patient_id=r.get("patient_id", ""),
+            appointment_id=r.get("appointment_id") or None,
+            dentist_id=r.get("dentist_id") or None,
+            dentist_name=r.get("dentist_name") or None,
+            blood_pressure=r.get("blood_pressure") or None,
+            medical_conditions=medical_conditions,
+            allergies=r.get("allergies") or None,
+            oral_hygiene_habits=r.get("oral_hygiene_habits") or None,
+            teeth_findings=teeth_findings,
+            canker_sores=canker_bool,
+            canker_sores_notes=r.get("canker_sores_notes") or None,
+            anomalous_teeth=anomalous_bool,
+            anomalous_teeth_notes=r.get("anomalous_teeth_notes") or None,
+            other_oral_notes=r.get("other_oral_notes") or None,
+            consent_status=r.get("consent_status", "approved"),
+            refusal_reason=r.get("refusal_reason") or None,
+            document_url_or_ref=r.get("document_url_or_ref") or None,
+            status=r.get("status", "completed"),
+            created_at=r.get("created_at", ""),
+            updated_at=r.get("updated_at", "")
+        )
+
+    def save_medical_checkup(self, checkup_data: MedicalCheckupCreate) -> MedicalCheckupResponse:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            checkup_rows = all_data.get(SHEET_CHECKUPS, [])
+            now_iso = datetime.now().isoformat()
+
+            # Serialize teeth findings and medical conditions
+            teeth_json = json.dumps([t.dict() for t in checkup_data.teeth_findings])
+            conditions_json = json.dumps(checkup_data.medical_conditions)
+
+            # Check if updating existing checkup for this appointment
+            target = None
+            if checkup_data.appointment_id:
+                for r in checkup_rows:
+                    if r.get("appointment_id", "").lower() == checkup_data.appointment_id.lower():
+                        target = r
+                        break
+
+            if target:
+                checkup_id = target["checkup_id"]
+                target["dentist_id"] = checkup_data.dentist_id or target.get("dentist_id", "")
+                target["blood_pressure"] = checkup_data.blood_pressure or ""
+                target["medical_conditions"] = conditions_json
+                target["allergies"] = checkup_data.allergies or ""
+                target["oral_hygiene_habits"] = checkup_data.oral_hygiene_habits or ""
+                target["teeth_findings_json"] = teeth_json
+                target["canker_sores"] = "TRUE" if checkup_data.canker_sores else "FALSE"
+                target["canker_sores_notes"] = checkup_data.canker_sores_notes or ""
+                target["anomalous_teeth"] = "TRUE" if checkup_data.anomalous_teeth else "FALSE"
+                target["anomalous_teeth_notes"] = checkup_data.anomalous_teeth_notes or ""
+                target["other_oral_notes"] = checkup_data.other_oral_notes or ""
+                target["consent_status"] = checkup_data.consent_status
+                target["refusal_reason"] = checkup_data.refusal_reason or ""
+                target["status"] = checkup_data.status
+                target["updated_at"] = now_iso
+            else:
+                seq = self._next_sequence(checkup_rows, "checkup_id")
+                checkup_id = f"CHK-{seq:06d}"
+                new_row = {
+                    "checkup_id": checkup_id,
+                    "patient_id": checkup_data.patient_id,
+                    "appointment_id": checkup_data.appointment_id or "",
+                    "dentist_id": checkup_data.dentist_id or "",
+                    "blood_pressure": checkup_data.blood_pressure or "",
+                    "medical_conditions": conditions_json,
+                    "allergies": checkup_data.allergies or "",
+                    "oral_hygiene_habits": checkup_data.oral_hygiene_habits or "",
+                    "teeth_findings_json": teeth_json,
+                    "canker_sores": "TRUE" if checkup_data.canker_sores else "FALSE",
+                    "canker_sores_notes": checkup_data.canker_sores_notes or "",
+                    "anomalous_teeth": "TRUE" if checkup_data.anomalous_teeth else "FALSE",
+                    "anomalous_teeth_notes": checkup_data.anomalous_teeth_notes or "",
+                    "other_oral_notes": checkup_data.other_oral_notes or "",
+                    "consent_status": checkup_data.consent_status,
+                    "refusal_reason": checkup_data.refusal_reason or "",
+                    "status": checkup_data.status,
+                    "created_at": now_iso,
+                    "updated_at": now_iso
+                }
+                checkup_rows.append(new_row)
+                target = new_row
+
+            all_data[SHEET_CHECKUPS] = checkup_rows
+
+            # Also synchronize clinical summary banner to linked appointment
+            if checkup_data.appointment_id:
+                for apt_r in all_data.get(SHEET_APPOINTMENTS, []):
+                    if apt_r.get("appointment_id", "").lower() == checkup_data.appointment_id.lower():
+                        summary_note = checkup_data.canker_sores_notes or checkup_data.other_oral_notes or "Checkup completed"
+                        apt_r["clinical_notes"] = summary_note
+                        if checkup_data.status == "completed":
+                            apt_r["status"] = "finished"
+                        apt_r["updated_at"] = now_iso
+                        break
+
+            audit_rows = all_data.get(SHEET_AUDIT, [])
+            audit_rows.append({
+                "log_id": f"LOG-{self._next_sequence(audit_rows, 'log_id'):06d}",
+                "timestamp": now_iso,
+                "staff_id": "staff_dentist",
+                "entity_type": "CHECKUP",
+                "entity_id": checkup_id,
+                "action": "SAVE",
+                "details": f"Saved medical checkup and odontogram for patient {checkup_data.patient_id} (findings: {len(checkup_data.teeth_findings)} teeth)"
+            })
+            all_data[SHEET_AUDIT] = audit_rows
+
+            self._write_all_sheets(all_data)
+
+            return self._deserialize_checkup_row(target)
+
+    def get_medical_checkup(self, checkup_id: str) -> Optional[MedicalCheckupResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            for r in all_data.get(SHEET_CHECKUPS, []):
+                if r.get("checkup_id", "").lower() == checkup_id.lower():
+                    return self._deserialize_checkup_row(r)
+            return None
+
+    def get_checkup_by_appointment(self, appointment_id: str) -> Optional[MedicalCheckupResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            for r in all_data.get(SHEET_CHECKUPS, []):
+                if r.get("appointment_id", "").lower() == appointment_id.lower():
+                    return self._deserialize_checkup_row(r)
+            return None
+
+    def list_checkups_for_patient(self, patient_id: str) -> List[MedicalCheckupResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            results = []
+            for r in all_data.get(SHEET_CHECKUPS, []):
+                if r.get("patient_id", "").lower() == patient_id.lower():
+                    results.append(self._deserialize_checkup_row(r))
+            return sorted(results, key=lambda c: c.created_at, reverse=True)
+
+    # =========================================================================
+    # PATIENT REQUESTS (SIMULATOR / WHATSAPP)
+    # =========================================================================
+
+    def _deserialize_patient_request_row(self, row: Dict[str, Any]) -> PatientRequestResponse:
+        return PatientRequestResponse(
+            request_id=str(row.get("request_id", "")),
+            patient_name=str(row.get("patient_name", "")),
+            patient_phone=str(row.get("patient_phone", "")),
+            patient_age=str(row["patient_age"]) if row.get("patient_age") else None,
+            patient_id=str(row["patient_id"]) if row.get("patient_id") else None,
+            dentist_id=str(row.get("dentist_id", "")),
+            preferred_date=str(row.get("preferred_date", "")),
+            preferred_start_time=str(row.get("preferred_start_time", "")),
+            preferred_end_time=str(row.get("preferred_end_time", "")),
+            reason=str(row["reason"]) if row.get("reason") else None,
+            source=str(row.get("source", "simulator")),
+            status=PatientRequestStatus(str(row.get("status", "pending"))),
+            review_notes=str(row["review_notes"]) if row.get("review_notes") else None,
+            appointment_id=str(row["appointment_id"]) if row.get("appointment_id") else None,
+            created_at=str(row.get("created_at", datetime.now().isoformat())),
+            updated_at=str(row.get("updated_at", datetime.now().isoformat()))
+        )
+
+    def create_patient_request(self, request_data: PatientRequestCreate) -> PatientRequestResponse:
+        now_iso = datetime.now().isoformat()
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            req_rows = all_data.get(SHEET_PATIENT_REQUESTS, [])
+            seq = self._next_sequence(req_rows, "request_id")
+            request_id = f"REQ-{seq:06d}"
+
+            new_row = {
+                "request_id": request_id,
+                "patient_name": request_data.patient_name,
+                "patient_phone": request_data.patient_phone,
+                "patient_age": request_data.patient_age or "",
+                "patient_id": request_data.patient_id or "",
+                "dentist_id": request_data.dentist_id,
+                "preferred_date": request_data.preferred_date,
+                "preferred_start_time": request_data.preferred_start_time,
+                "preferred_end_time": request_data.preferred_end_time,
+                "reason": request_data.reason or "",
+                "source": request_data.source or "simulator",
+                "status": PatientRequestStatus.PENDING.value,
+                "review_notes": "",
+                "appointment_id": "",
+                "created_at": now_iso,
+                "updated_at": now_iso
+            }
+            req_rows.append(new_row)
+            all_data[SHEET_PATIENT_REQUESTS] = req_rows
+
+            audit_rows = all_data.get(SHEET_AUDIT, [])
+            audit_rows.append({
+                "log_id": f"LOG-{self._next_sequence(audit_rows, 'log_id'):06d}",
+                "timestamp": now_iso,
+                "staff_id": "simulator_bot",
+                "entity_type": "PATIENT_REQUEST",
+                "entity_id": request_id,
+                "action": "CREATE",
+                "details": f"Patient request submitted from {request_data.source} for {request_data.patient_name}"
+            })
+            all_data[SHEET_AUDIT] = audit_rows
+
+            self._write_all_sheets(all_data)
+            return self._deserialize_patient_request_row(new_row)
+
+    def get_patient_request(self, request_id: str) -> Optional[PatientRequestResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            for r in all_data.get(SHEET_PATIENT_REQUESTS, []):
+                if r.get("request_id", "").lower() == request_id.lower():
+                    return self._deserialize_patient_request_row(r)
+            return None
+
+    def list_patient_requests(self, status: Optional[str] = None) -> List[PatientRequestResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            results = []
+            for r in all_data.get(SHEET_PATIENT_REQUESTS, []):
+                if status:
+                    if r.get("status", "").lower() != status.lower():
+                        continue
+                results.append(self._deserialize_patient_request_row(r))
+            return sorted(results, key=lambda x: x.created_at, reverse=True)
+
+    def update_patient_request_status(
+        self, request_id: str, status: str, review_notes: Optional[str] = None, appointment_id: Optional[str] = None
+    ) -> Optional[PatientRequestResponse]:
+        now_iso = datetime.now().isoformat()
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            req_rows = all_data.get(SHEET_PATIENT_REQUESTS, [])
+            target = None
+            for r in req_rows:
+                if r.get("request_id", "").lower() == request_id.lower():
+                    r["status"] = status
+                    if review_notes is not None:
+                        r["review_notes"] = review_notes
+                    if appointment_id is not None:
+                        r["appointment_id"] = appointment_id
+                    r["updated_at"] = now_iso
+                    target = r
+                    break
+
+            if not target:
+                return None
+
+            all_data[SHEET_PATIENT_REQUESTS] = req_rows
+
+            audit_rows = all_data.get(SHEET_AUDIT, [])
+            audit_rows.append({
+                "log_id": f"LOG-{self._next_sequence(audit_rows, 'log_id'):06d}",
+                "timestamp": now_iso,
+                "staff_id": "staff_desk",
+                "entity_type": "PATIENT_REQUEST",
+                "entity_id": request_id,
+                "action": "UPDATE_STATUS",
+                "details": f"Updated request status to {status}. Notes: {review_notes or 'None'}"
+            })
+            all_data[SHEET_AUDIT] = audit_rows
+
+            self._write_all_sheets(all_data)
+            return self._deserialize_patient_request_row(target)
+
+
