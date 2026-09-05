@@ -1,12 +1,12 @@
 # DentalFlow (Clinic Assistant)
 
-**DentalFlow** is an administrative website and backend for dental clinic front-desk staff to register patients, log structured previous visit summaries, manage dentist availability, and book appointment ranges.
+**DentalFlow** is an administrative product for dental clinic front-desk staff to register patients, log structured previous visit summaries, manage dentist availability, and book appointment ranges.
 
 ---
 
 ## 📁 Repository Structure
 
-- [`docs/`](file:///docs/): Complete project specifications, design specifications, and operating manuals.
+- [`docs/`](file:///docs/): Core specifications, design guidelines, and operating rules.
   - [`Agent.md`](file:///docs/Agent.md) — Agent operating manual & principles.
   - [`Project Rules.md`](file:///docs/Project%20Rules.md) — Non-negotiable engineering & safety rules.
   - [`Product Requirements Document.md`](file:///docs/Product%20Requirements%20Document.md) — Product baseline and MVP scope.
@@ -23,9 +23,8 @@
 ```bash
 cd backend
 pip install -r requirements.txt
-pytest
 uvicorn app.main:app --reload --port 8000
 ```
 
-- **Interactive API Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Interactive API Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **Health Check:** [http://127.0.0.1:8000/api/system/health](http://127.0.0.1:8000/api/system/health)
