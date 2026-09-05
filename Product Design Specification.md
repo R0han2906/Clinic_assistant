@@ -2,175 +2,160 @@
 
 ## 1. Design Objective
 
-The product should feel simple for patients and dependable for clinic staff. It should reduce decisions, typing, and uncertainty during appointment administration.
+The first experience is for dental-clinic staff, not patients. The website must help a receptionist complete registration and booking tasks accurately while working under time pressure.
 
-The design must prioritize clarity and recovery over visual novelty.
+Patients will use WhatsApp only in a later phase. The future WhatsApp flow should mirror the same internal concepts but should not determine the first website design.
 
-## 2. Experience Model
+## 2. Primary Staff Workflow
 
-The product has two connected experiences:
-
-| Experience | Design goal |
-|---|---|
-| Patient WhatsApp conversation | Complete a common administrative task with minimal effort |
-| Staff dashboard | Understand and control the clinic’s operational state quickly |
-
-The patient should not need to understand the internal system. The staff member must be able to understand exactly what happened.
-
-## 3. Patient Conversation Principles
-
-1. Start with a clear welcome and the clinic identity.
-2. Present a small number of choices.
-3. Prefer buttons and lists over free typing.
-4. Keep one question per step.
-5. Confirm important details before committing.
-6. Show doctor, service, date, time, and timezone clearly.
-7. Offer back, restart, cancel, and human help.
-8. Never make a patient repeat information unnecessarily.
-9. Use plain language and the clinic’s approved terminology.
-10. Tell the patient when the request has been sent to a human.
-
-## 4. Booking Conversation
-
-Recommended flow:
+The main workflow should be:
 
 ```text
-Welcome
-  -> Choose service
-  -> Choose doctor or first available
-  -> Choose date
-  -> Choose slot
-  -> Confirm details
-  -> Create appointment
-  -> Send confirmation
+Find or register patient
+        -> Review previous visits
+        -> Select dentist
+        -> Check dentist availability
+        -> Select appointment range
+        -> Confirm details
+        -> Save appointment
+        -> Show updated schedule
 ```
 
-The system must not claim that an appointment is confirmed until the transaction succeeds.
+The workflow should be possible from one clear patient profile and appointment context without forcing staff to navigate through unrelated screens.
 
-If the selected slot becomes unavailable, explain the conflict and present fresh options. Do not silently substitute another time.
+## 3. Main Website Screens
 
-## 5. Cancellation and Rescheduling
+### Staff login
 
-Cancellation must display the appointment being cancelled and ask for confirmation.
+The login screen should be simple and should not expose operational data before authentication.
 
-Rescheduling should show available alternatives first. The old appointment must remain intact until the new slot is successfully booked.
+### Today dashboard
 
-After a cancellation, the patient should receive a clear status message. If the clinic uses a waitlist, the system may begin recovery according to configured rules.
+The first screen after login should show today’s appointments, dentists working today, unconfirmed items, and actions requiring staff attention.
 
-## 6. Human Handoff
+### Patient search
 
-The handoff message should be short and honest:
+Staff should be able to search by patient identifier, name, or phone number. Search results must display enough information to distinguish patients without exposing unnecessary details.
 
-> I’m transferring this conversation to the clinic team. A staff member will respond here. This chat is for appointments and clinic administration, not emergencies.
+### Patient profile
 
-The staff queue should show:
+The profile should show registration information, previous visit summaries, upcoming appointments, and actions to book or modify an appointment.
 
-- Patient identifier.
-- Conversation start time.
-- Last patient message.
-- Reason for handoff.
-- Assigned staff member.
-- Current status.
-- Response-time indicator.
+### Registration form
 
-## 7. Staff Dashboard Structure
+The form should collect only the approved fields. Required and optional fields must be visibly different. Duplicate-looking patients should trigger a review step rather than silently creating another record.
 
-The minimum dashboard navigation should be:
+### Dentist availability
 
-- Today.
-- Calendar.
-- Appointments.
-- Conversations.
-- Doctors and schedules.
-- Waitlist.
-- Reports.
-- Settings.
+Staff should see which dentist is available, unavailable, on leave, or already booked. If two or three dentists are available, the page should make the choices explicit.
 
-The default landing screen should answer three questions immediately:
+### Appointment booking
 
-1. What is happening today?
-2. What requires staff attention?
-3. What could cause lost capacity or patient frustration?
+The booking page should show patient, dentist, date, start time, end time, and appointment status before the final confirmation.
 
-## 8. Calendar Design
+### Schedule
 
-The calendar should support day and agenda views first. Week and month views can come later.
+The schedule should support a daily view first. It should show dentist, patient, appointment range, and status. A weekly view may be added after staff usage proves it is needed.
 
-Each appointment should display:
+## 4. Design Principles
 
-- Time.
-- Patient name or safe identifier.
-- Doctor.
-- Service.
-- Status.
-- Source, such as WhatsApp or manual.
-- Attention indicator when action is required.
+1. **Staff first:** Optimize for receptionists and clinic operations.
+2. **One task at a time:** Avoid presenting every configuration option on one screen.
+3. **Visible truth:** Show the current dentist availability and appointment status clearly.
+4. **Safe confirmation:** Require confirmation before saving, cancelling, or rescheduling.
+5. **Recoverable errors:** Explain what went wrong and how staff can continue.
+6. **No silent changes:** Never substitute a dentist or appointment range without showing it.
+7. **Data minimization:** Do not display clinical information where it is not needed.
+8. **Excel is invisible to normal use:** Staff use the website; the workbook is a storage and export layer.
 
-Use consistent status labels:
+## 5. Registration UX
 
-- Pending.
-- Confirmed.
-- Cancelled.
-- Rescheduled.
-- Completed.
-- No-show.
-- Requires attention.
+The registration form should be divided into small sections:
 
-Never communicate status only through color. Use text and accessible icons as well.
+- Identity: name and patient identifier.
+- Contact: phone number and optional email.
+- Demographics: age or date of birth.
+- Clinic-required acknowledgement or consent.
+- Save and continue to appointment.
 
-## 9. Visual Direction
+After saving, show a clear confirmation with the patient identifier. If a possible duplicate is found, show the matching records and ask staff to choose an existing patient or confirm a new record.
 
-The visual style should be calm, professional, and operational.
+## 6. Previous Visit UX
 
-Recommended qualities:
+Previous visits should be displayed as a chronological list or table with date, dentist, visit type, and short staff-entered summary.
 
-- High contrast.
-- Neutral background.
-- One primary action color.
-- Clear status colors with text labels.
-- Moderate spacing.
-- Large readable type.
-- Few decorative elements.
-- No excessive gradients, animation, or dashboard clutter.
+The first version should not display an unstructured mass of sensitive notes. If a visit summary is needed, keep it short, structured, and accessible only to authorized staff.
 
-The dashboard should look like a dependable clinic operations tool, not a social media application.
+## 7. Dentist and Availability UX
 
-## 10. Accessibility
+The availability screen should show:
 
-The dashboard must support keyboard navigation, visible focus states, readable contrast, clear form labels, error messages near the relevant field, and layouts that work on laptop and tablet screens.
+- Dentist name.
+- Working status.
+- Working hours.
+- Leave or blocked periods.
+- Existing appointments.
+- Available ranges.
 
-WhatsApp messages should avoid excessive text, ambiguous instructions, and critical information conveyed through emoji or color alone.
+When a staff member selects a dentist, the system should show the chosen dentist prominently. If “any available dentist” is allowed, the final confirmation must still show which dentist was assigned.
 
-## 11. Error States
+## 8. Appointment Confirmation
 
-Every important action needs an explicit error state.
+Before saving, show a confirmation card:
 
-Examples:
+```text
+Patient: [name]
+Dentist: [dentist]
+Date: [date]
+Time: [start]–[end]
+Status: Ready to confirm
+```
 
-| Situation | User-facing behavior |
+The final action should be explicit, such as `Confirm appointment`. After saving, the interface should show the appointment identifier and status.
+
+## 9. Error States
+
+| Situation | Design response |
 |---|---|
-| Slot taken | Explain that it is no longer available and show alternatives |
-| WhatsApp send failure | Keep the appointment state visible and alert staff |
-| Webhook delay | Avoid duplicate response and process safely when received |
-| Clinic closed | Show next available hours or human-support option |
-| Unknown request | Ask a clarifying question or hand off |
-| Backend failure | Give a safe message and place the issue in staff attention queue |
+| Patient not found | Offer registration without losing the current intent |
+| Possible duplicate | Show matching records and require staff confirmation |
+| Dentist unavailable | Explain why and show valid alternatives |
+| Range already booked | Refresh availability and ask staff to choose again |
+| Excel write failed | Do not show success; preserve entered information and provide retry/support action |
+| Workbook locked | Tell staff that another operation is in progress; retry safely |
+| Unknown error | Show a safe message and create a staff or admin alert |
 
-## 12. Content Rules
+## 10. Visual Direction
 
-Use short sentences, direct verbs, and specific labels. Avoid technical language such as “intent classification,” “webhook,” or “API” in patient messages.
+Use a calm, professional interface suitable for a dental clinic. Prioritize readable typography, clear labels, high contrast, consistent spacing, restrained color, and obvious primary actions.
 
-Do not say “Done” when the system has only started a request. Use accurate states such as “Checking availability,” “Appointment confirmed,” or “Waiting for clinic staff.”
+Appointment status must be communicated with text as well as color. Avoid excessive animations, decorative dashboards, and dense charts in the first version.
 
-## 13. Design Validation
+## 11. Later WhatsApp Design
 
-Test designs with real receptionists before polishing them. Ask them to complete realistic tasks without coaching:
+WhatsApp should ask for one decision at a time:
 
-- Find today’s unconfirmed appointments.
-- Block a doctor’s leave.
-- Reschedule a patient.
-- Take over a conversation.
-- Find a cancelled slot.
-- Identify a failed reminder.
+1. New or existing patient.
+2. Patient name and required registration details.
+3. Preferred dentist or any available dentist.
+4. Preferred date or appointment range.
+5. Available options.
+6. Confirmation.
+7. Human-support option.
 
-A design is successful when staff can complete these tasks accurately under time pressure.
+The WhatsApp flow must not expose the Excel workbook or internal identifiers unnecessarily. It should send structured information to the backend and show the patient an understandable confirmation.
+
+## 12. Usability Testing
+
+Test with real clinic staff using realistic tasks:
+
+- Register a new patient.
+- Find an existing patient.
+- Review a previous visit.
+- Identify the available dentist.
+- Book a range.
+- Cancel and reschedule.
+- Recover from a failed write.
+- Find today’s appointments.
+
+A design is acceptable when staff can complete the core tasks accurately without developer explanation.

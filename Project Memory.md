@@ -2,91 +2,90 @@
 
 ## Purpose
 
-This file stores durable project context. It should contain stable facts, approved decisions, evidence, risks, and unresolved questions. It is not a task log and should not contain temporary brainstorming.
+This file stores durable project context, approved decisions, current stage, evidence, risks, and unresolved questions. It is not a temporary task log.
 
-## Product Identity
+## Current Product Identity
 
-**Working name:** ClinicFlow WhatsApp
+**Working name:** DentalFlow
 
-**Category:** WhatsApp-first outpatient clinic appointment automation.
+**Domain:** Dentist-clinic staff operations.
 
-**Primary interface:** WhatsApp for patients; web dashboard for clinic staff.
+**First product:** Staff website for patient registration, previous-visit summaries, dentist availability, and appointment-range booking.
 
-**Initial backend direction:** FastAPI, PostgreSQL, background worker, and official WhatsApp Business Platform integration.
+**Later product input:** Patient requests through WhatsApp.
 
-**Initial architecture:** Modular monolith.
+**Initial storage:** One structured Excel workbook per clinic.
 
-## Approved Product Direction
+**Deferred storage:** Supabase or another managed PostgreSQL system after workflow validation.
 
-The project will begin with administrative workflows, especially booking, confirmation, cancellation, rescheduling, reminders, waitlist recovery, and human handoff.
+## Clarified Scope
 
-The product will not initially provide diagnosis, clinical triage, prescriptions, medical records, hospital operations, or a separate patient mobile application.
+For this project, “hospital” means a dentist clinic. The first customer is a clinic with mostly one dentist, with support for two or three dentists when required.
 
-## Target Customer
+The clinic staff will use the website. The Excel workbook is the temporary pilot data store and can be inspected or downloaded by staff when necessary. The website, not direct workbook editing, is the normal operating interface.
 
-The initial target is a small private outpatient specialty clinic with approximately two to eight doctors, several staff members, significant WhatsApp appointment traffic, and measurable scheduling or no-show problems.
+The initial patient data includes registration details such as name, age or date of birth, phone number, optional email, stable patient identifier, and structured summaries of previous visits. The system also stores dentist availability and appointment ranges.
 
-The first launch must choose one specialty and one geography rather than targeting all healthcare providers.
+## Approved Product Order
+
+1. Build the staff website.
+2. Validate registration and appointment workflows with a dentist clinic.
+3. Use Excel temporarily for controlled iterations.
+4. Improve scheduling reliability and staff usability.
+5. Migrate to Supabase only when concurrency, reliability, backups, or scale justify it.
+6. Add WhatsApp as a patient-input channel using the same backend services.
 
 ## Technical Decisions
 
-- FastAPI is the initial backend framework.
-- PostgreSQL is the source of truth.
-- Appointment creation is transactional and deterministic.
-- WhatsApp provider payloads are isolated behind an adapter.
-- Background jobs handle reminders and retries.
-- A staff dashboard is needed for real clinic operations, but it can be delayed during the earliest prototype.
-- AI is optional and constrained to administrative intent understanding or approved FAQ assistance.
-- AI cannot decide availability, bypass permissions, diagnose, prescribe, or modify clinic rules.
+- FastAPI is the initial backend.
+- The website communicates with FastAPI, never directly with Excel.
+- The workbook repository is the only writer to the Excel file.
+- Workbook writes use locking, validation, backups, and atomic replacement.
+- Stable identifiers must be used from the beginning to make migration possible.
+- Appointment availability and booking are deterministic backend services.
+- WhatsApp, when added, must call the same services as the website.
+- Supabase is not required for the first controlled iteration.
+- The first architecture is a modular monolith.
 
-## Business Decisions
+## Data Boundaries
 
-The product should be sold as a digital administrative receptionist, not as a generic chatbot or AI doctor.
+The initial product must not become a complete electronic medical record. Previous visits should be concise, structured summaries. New fields require a clear purpose and review of privacy implications.
 
-The primary value claims must be measurable: staff time saved, increased confirmation rate, reduced no-shows, faster rescheduling, or recovered cancelled slots.
-
-A paid pilot is stronger validation than positive feedback alone.
-
-## Safety and Privacy Decisions
-
-- Use official WhatsApp integration only.
-- Record opt-in and opt-out status.
-- Provide human escalation.
-- Do not use real patient data during development.
-- Enforce clinic tenant isolation.
-- Do not claim regulatory compliance without formal review.
-- Keep sensitive message content out of ordinary logs.
+Passwords and API secrets must never be stored in the workbook. Real patient data must not be used in development or test environments.
 
 ## Current Stage
 
-The project is at the planning and validation stage. The next practical milestone is to choose the first specialty and conduct structured interviews with clinics before building a broad platform.
+The project is in the revised planning stage. The next implementation step is to define the first dental-clinic workflow and build the staff website prototype before adding WhatsApp.
 
-## Known Risks
+## Main Risks
 
-1. Clinics may like the demo but refuse to pay.
-2. WhatsApp policies and pricing may change.
-3. Clinic-specific scheduling rules may be more complex than expected.
-4. Staff may distrust automation if human takeover is difficult.
-5. Patient data may create legal and security obligations.
-6. Provider onboarding may create account-ownership and migration friction.
-7. Free hosting may not provide production reliability or backups.
+1. Excel is not a durable multi-user production database.
+2. Workbook corruption or concurrent writes could damage clinic records.
+3. Cloud deployments may use ephemeral storage unless persistent storage is configured.
+4. Staff may need more scheduling flexibility than fixed ranges provide.
+5. Duplicate patient records may be created without a review workflow.
+6. Previous-visit information may become more clinical and sensitive than initially planned.
+7. WhatsApp may be added before the internal workflow is stable.
+8. Supabase migration may be delayed if identifiers and workbook columns are inconsistent.
 
 ## Unresolved Questions
 
-- Which country and regulatory environment is the first launch target?
-- Which specialty has the strongest combination of message volume and scheduling pain?
-- Will the product connect directly to Meta Cloud API or use an approved provider for the pilot?
-- What is the exact pricing model?
-- What data is necessary for the first booking workflow?
-- Does the first clinic require payment collection?
-- What is the required patient verification method for changing an appointment?
+- Which dental clinic will be the first design partner?
+- Which country and privacy requirements apply?
+- Are appointment ranges fixed or generated from duration rules?
+- How should existing patients be matched safely?
+- What exact previous-visit summary does the clinic need?
+- Will the pilot run locally or on persistent hosted storage?
+- When is the clinic ready to migrate from Excel to Supabase?
+- Which WhatsApp provider or Meta Cloud API path will be used later?
 
-## Evidence Standards
+## Evidence Standard
 
-Claims about WhatsApp capability, pricing, policies, security, healthcare regulation, or provider limits must be checked against current authoritative documentation before implementation or customer commitments.
+Claims about WhatsApp capabilities, pricing, policies, data protection, or provider limits must be checked against current authoritative documentation before implementation or commercial promises.
 
 ## Change History
 
-| Date | Change |
+| Change | Result |
 |---|---|
-| Initial | Created product direction and operating baseline |
+| Initial planning | Product originally considered WhatsApp-first clinic automation |
+| Revised scope | Product changed to dentist-clinic website first, Excel pilot storage, WhatsApp later, Supabase deferred |

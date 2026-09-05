@@ -2,180 +2,194 @@
 
 ## Product
 
-**Working name:** ClinicFlow WhatsApp
+**Working name:** DentalFlow
 
-**Product type:** WhatsApp-first clinic appointment and administrative automation system.
+**Product type:** Dentist-clinic staff website with temporary Excel-based data storage and a later WhatsApp patient-input channel.
 
-**Document status:** Initial product baseline
+**Document status:** Revised product baseline
 
-**Owner:** Product team
+## 1. Important Scope Decision
 
-## 1. Product Summary
+The first product is **not** a WhatsApp bot and not a general hospital-management system.
 
-ClinicFlow WhatsApp helps small outpatient clinics manage appointment conversations through WhatsApp while giving clinic staff a simple operational dashboard.
+The first product is a website used by a dental clinic’s staff to register patients, record previous visits, manage dentists and their availability, and book appointment ranges. WhatsApp will be integrated only after the website workflow is proven.
 
-Patients do not need to install a new application. They can ask administrative questions, view available appointment slots, book, confirm, cancel, and reschedule appointments. Staff can manage schedules, take over conversations, and monitor the clinic’s daily operations from the dashboard.
+For this document, “hospital” means **dentist clinic**.
 
-The product is an **administrative automation system**, not an AI doctor and not a replacement for clinical judgment.
+## 2. Product Summary
 
-## 2. Problem Statement
+DentalFlow gives dental-clinic staff a simple internal website. Staff can register a patient, record basic patient details, record previous visit information, select the dentist requested by the patient, check whether the dentist is available, and book an appointment range.
 
-Small clinics often manage appointments through a mixture of phone calls, WhatsApp messages, paper notes, spreadsheets, and calendars. This creates repetitive receptionist work, slow replies, missed appointments, double bookings, and empty slots after cancellations.
+During the initial iteration stage, the system stores data in a structured Excel workbook rather than Supabase. The website remains the main user interface for staff. The workbook is the temporary pilot data store and can also be inspected or exported by staff.
 
-The product should reduce repetitive appointment work without forcing patients to learn a new application or forcing clinics to replace their existing staff immediately.
+Later, patients will provide appointment input through WhatsApp. WhatsApp will send structured requests to the same backend workflow used by the staff website. It will not create a separate booking system.
 
 ## 3. Product Vision
 
-> Make clinic appointment administration as simple as replying to a WhatsApp message while giving clinic staff reliable operational control.
+> Give small dental clinics a simple, reliable way to register patients and manage dentist availability before introducing WhatsApp automation.
 
-## 4. Target Customer
+## 4. First Target Customer
 
-The first target customer is a private outpatient specialty clinic with approximately two to eight doctors, several reception or support staff, recurring appointments, and meaningful WhatsApp traffic.
+The first customer is a single-location dental clinic with one dentist most of the time, with support for two or three dentists when necessary. The clinic has front-desk staff who need a clear way to register patients and schedule appointments.
 
-The initial product should focus on one specialty and one launch geography. Suitable early niches include dental, dermatology, physiotherapy, ophthalmology, fertility, and diagnostic consultation clinics.
-
-Hospitals, emergency departments, pharmacies, and complex multi-location healthcare networks are out of scope for the first release.
+The first release should not target hospitals, large dental chains, emergency departments, or complex multi-location practices.
 
 ## 5. Users
 
-| User | Primary need |
+| User | Main need |
 |---|---|
-| Patient | Book or manage an appointment quickly through WhatsApp |
-| Receptionist | Manage schedules, correct bookings, and handle exceptions |
-| Doctor | View relevant appointment information and availability |
-| Clinic owner | Reduce workload, improve attendance, and monitor operations |
-| Platform administrator | Configure clinics, support customers, and manage platform health |
+| Receptionist or clinic staff | Register patients, review history, check dentist availability, and book appointments |
+| Dentist | See their schedule and upcoming patient appointments |
+| Clinic owner | Review operational activity and maintain dentist configuration |
+| Platform administrator | Configure, support, and maintain the product |
+| Patient | Later, submit appointment information through WhatsApp |
 
 ## 6. Product Principles
 
-1. **Administrative first:** The product manages scheduling and communication, not diagnosis.
-2. **Human control:** Staff can take over any conversation or change any appointment.
-3. **Deterministic booking:** The backend, not an AI model, decides whether an appointment is valid.
-4. **Minimal patient friction:** Patients should use WhatsApp without installing another application.
-5. **Operational clarity:** Staff should see the truth of the schedule in one place.
-6. **Privacy by design:** Collect only what is needed and protect it by default.
-7. **Measurable value:** Every feature should connect to saved time, fewer errors, better attendance, or recovered slots.
-8. **Tenant isolation:** One clinic must never see another clinic’s data.
+1. **Website first:** Build and validate the clinic staff workflow before WhatsApp.
+2. **Excel first, but temporary:** Use a structured workbook for early iterations; do not treat it as the final production database.
+3. **One booking engine:** Website bookings and future WhatsApp bookings must use the same availability and appointment rules.
+4. **Small-clinic focus:** Optimize for a single dental clinic before supporting complex organizations.
+5. **Human control:** Staff can review and correct every appointment.
+6. **Administrative scope:** Store only the patient information needed for the initial workflow.
+7. **No unsafe clinical automation:** Do not diagnose or prescribe.
+8. **Migration-ready:** Excel columns and identifiers must be designed so that migration to Supabase or PostgreSQL is straightforward.
 
-## 7. Goals for the MVP
+## 7. MVP Goals
 
-The MVP must allow a patient to complete a basic appointment journey through WhatsApp and allow staff to control that journey from a simple dashboard.
+The first website MVP must allow staff to:
 
-### MVP goals
+- Log in securely.
+- Register a patient.
+- Record patient name, age or date of birth, phone number, and relevant basic details.
+- Record previous visit information in a structured way.
+- Select a requested dentist.
+- See whether one, two, or three dentists are available.
+- View valid appointment ranges.
+- Book an appointment range.
+- Modify or cancel an appointment.
+- View the dentist’s schedule.
+- Search for an existing patient.
+- Review the patient’s previous visits.
+- Store and retrieve the records from a structured Excel workbook.
 
-- Configure a clinic, doctors, services, and working hours.
-- Show valid appointment slots.
-- Prevent double booking.
-- Book, confirm, cancel, and reschedule appointments.
-- Send approved confirmation and reminder messages.
-- Allow staff takeover and manual correction.
-- Record consent, important actions, and message status.
-- Measure automation rate, staff intervention, cancellations, and attendance.
+## 8. Initial Data Scope
 
-### Non-goals for the MVP
+### Patient registration
 
-- Clinical diagnosis or medical triage.
-- AI-generated prescriptions.
-- Patient medical-record management.
-- Hospital, pharmacy, laboratory, or insurance workflows.
-- A separate patient mobile app.
-- Complex billing or claims processing.
-- Fully autonomous treatment follow-up.
+The initial patient record should contain only the fields needed for registration and appointment operations:
 
-## 8. Core User Journeys
+- Patient identifier.
+- Full name.
+- Age or date of birth.
+- Phone number.
+- Optional email.
+- Emergency-contact information only if the clinic explicitly requires it.
+- Consent or acknowledgement status where applicable.
+- Created date and last updated date.
 
-### Patient booking
+### Previous visits
 
-The patient sends a WhatsApp message. The system identifies the clinic, presents configured options, checks real availability, temporarily holds the selected slot, confirms the appointment, and records the conversation.
+The first version should not attempt to recreate a complete electronic medical record. It should store a structured visit summary such as:
 
-### Patient rescheduling
+- Visit identifier.
+- Patient identifier.
+- Visit date.
+- Dentist.
+- Visit type.
+- Short staff-entered summary.
+- Follow-up date or recommendation, if the clinic chooses to record it.
 
-The patient requests a change. The system verifies identity using the WhatsApp number and configured safeguards, shows valid alternatives, releases the original slot only after the new slot is confirmed, and sends an updated confirmation.
+Avoid storing unnecessary clinical detail until the data model, privacy controls, retention policy, and professional requirements are reviewed.
 
-### Cancellation and waitlist recovery
+### Dentist availability
 
-A patient cancels. The system marks the appointment as cancelled, updates availability, and optionally offers the slot to eligible waitlisted patients according to clinic rules.
+The system should support:
 
-### Staff takeover
+- Dentist name and profile.
+- Working days and hours.
+- Breaks.
+- Leave or blocked periods.
+- Appointment duration or slot range.
+- Current availability.
+- Maximum number of parallel dentists supported by the clinic configuration.
 
-A patient asks an unclear, sensitive, urgent, or clinical question. The system stops automated replies, informs the patient that a staff member will respond, and places the conversation in a staff queue.
+## 9. Appointment Requirements
 
-## 9. Functional Requirements
+The appointment flow must:
 
-### Clinic configuration
+1. Identify the patient.
+2. Show the requested dentist or available dentists.
+3. Check dentist working hours, leave, breaks, and existing appointments.
+4. Show valid appointment ranges.
+5. Allow staff to select a range.
+6. Confirm the dentist, date, start time, end time, and patient.
+7. Save the appointment to the workbook.
+8. Prevent conflicting appointments within the configured scope.
+9. Show the updated schedule.
 
-The system must support clinic profile details, operating hours, holidays, doctors, services, appointment duration, buffers, leave periods, booking limits, cancellation rules, reminder timing, and support contacts.
+The first version may use fixed appointment ranges. Flexible slot generation can be added only after the clinic’s actual scheduling pattern is understood.
 
-### Appointment engine
+## 10. Website Requirements
 
-The appointment engine must use timezone-aware timestamps, respect doctor availability, prevent conflicts, support configurable appointment durations, maintain appointment status history, and use transactional protection against concurrent bookings.
+The staff website must provide:
 
-### WhatsApp integration
+- Secure staff login.
+- Patient registration form.
+- Patient search and profile page.
+- Previous-visit list.
+- Dentist and availability setup.
+- Daily schedule view.
+- Appointment creation, edit, cancellation, and rescheduling.
+- Clear appointment status.
+- Workbook data-health indicator.
+- Manual export or download of the Excel workbook.
+- Basic audit information for important changes.
 
-The system must receive incoming messages through verified webhooks, send permitted message types, support approved templates, track message status, store provider message identifiers, handle retries safely, and support human escalation.
+The website should not expose raw workbook internals as the primary experience. Staff should use clear forms and calendars; the workbook is the pilot storage layer and fallback inspection format.
 
-### Staff dashboard
+## 11. WhatsApp Later
 
-The dashboard must provide a calendar, appointment list, filtering by doctor and status, manual create/edit/cancel actions, schedule management, staff takeover, waitlist visibility, and basic operational metrics.
+WhatsApp is a later phase. It will collect administrative input such as:
 
-### Authentication and authorization
+- Patient name.
+- Phone number.
+- Preferred dentist.
+- Preferred date or date range.
+- Preferred appointment range.
+- Basic appointment reason, if the clinic approves it.
 
-Users must authenticate securely. Access must be controlled by clinic membership and role. A receptionist, doctor, clinic owner, and platform administrator must not automatically have the same permissions.
+The WhatsApp flow must send the request to the same backend booking service. It must not write directly to Excel or create a separate set of appointment rules.
 
-### Auditability
+## 12. Explicitly Out of Scope
 
-The system must record who created, changed, cancelled, or manually approved an appointment. Logs must not expose unnecessary sensitive message content.
+- WhatsApp integration in the first website iteration.
+- Supabase in the first iteration.
+- Complete medical records.
+- Diagnosis, treatment advice, or prescription generation.
+- Emergency triage.
+- Billing, insurance, pharmacy, or laboratory management.
+- Multi-location organizations.
+- Patient mobile application.
+- Fully automatic clinical follow-up.
 
-## 10. Non-Functional Requirements
-
-| Area | MVP requirement |
-|---|---|
-| Availability | Reliable enough for pilot clinics; failures must be visible and recoverable |
-| Security | HTTPS, secret management, access control, tenant isolation, and secure backups |
-| Performance | Normal dashboard requests should usually return within two seconds under pilot load |
-| Reliability | Idempotent webhook processing and safe retry behavior |
-| Privacy | Minimum necessary collection, consent records, retention rules, and deletion/export process |
-| Accessibility | Clear text, readable controls, keyboard-friendly dashboard basics |
-| Observability | Structured logs, error tracking, health checks, and alerting |
-| Maintainability | Modular backend, migrations, automated tests, and documented decisions |
-
-## 11. Success Metrics
-
-The MVP is successful only if it produces business value.
+## 13. Success Metrics
 
 | Metric | Initial target |
 |---|---|
-| Pilot clinics | At least 3 |
-| Paying pilot clinics | At least 1 |
-| Booking completion rate | Measured and improving each iteration |
-| Staff intervention rate | Decreasing for configured administrative flows |
-| Staff time saved | Measured against the clinic baseline |
-| Recovered cancelled slots | Measured during the pilot |
-| No-show rate | Compared with the pre-pilot baseline |
-| Critical booking errors | Zero tolerated in confirmed production workflows |
-| Patient complaints | Reviewed weekly and resolved systematically |
-
-## 12. Release Criteria
-
-Do not release to real patient traffic until the system has passed booking conflict tests, webhook retry tests, permission tests, tenant-isolation tests, reminder tests, backup-restore tests, and human-handoff tests.
-
-The clinic must approve its configuration, privacy notice, consent language, support process, and escalation process before activation.
-
-## 13. Open Decisions
-
-The following decisions must be made before production implementation:
-
-- First specialty and launch geography.
-- Direct Meta Cloud API or an approved provider.
-- Whether patients can book without an existing patient record.
-- Required patient verification for rescheduling and cancellation.
-- Data retention period.
-- Whether payments are included in the first commercial release.
-- Clinic pricing model and message-cost pass-through.
-- Whether the product is a single-clinic deployment or multi-tenant SaaS from the beginning.
+| Pilot dental clinics | At least 1, preferably 3 |
+| Staff completing registration without developer help | 100% of pilot staff |
+| Appointment conflict rate | Zero confirmed double bookings |
+| Patient lookup accuracy | Staff can find the correct patient reliably |
+| Data-write reliability | Every confirmed action produces a saved workbook record |
+| Time to create an appointment | Faster than the clinic’s current process |
+| Staff willingness to continue | Positive after at least two weeks of use |
+| Excel-to-database migration readiness | All records have stable identifiers and consistent columns |
 
 ## 14. Product Positioning
 
-The product should be sold as a digital administrative receptionist, not as a chatbot and not as a medical AI system.
+The first product should be positioned as:
 
-> Your patients continue using WhatsApp. ClinicFlow turns those conversations into confirmed appointments, reminders, rescheduling, cancellation recovery, and a clear schedule for your staff.
+> A simple dental-clinic appointment and patient-registration website that helps staff manage dentist availability and patient history without forcing the clinic to adopt a complex hospital system.
+
+WhatsApp should be positioned later as a convenient patient-input channel, not as the product’s foundation before the internal clinic workflow is proven.

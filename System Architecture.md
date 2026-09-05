@@ -1,235 +1,200 @@
 # System Architecture
 
-## 1. Architecture Goal
+## 1. Architecture Decision
 
-The system must reliably convert WhatsApp conversations into valid clinic appointments while keeping clinic staff in control and protecting clinic and patient data.
+The first implementation is a **clinic staff website backed by FastAPI and a structured Excel workbook**.
 
-The first implementation should be a **modular monolith**. It should have clear internal modules but remain one deployable backend. Microservices are not justified until scale, team size, or operational boundaries require them.
+Supabase is intentionally deferred. It should be introduced only after the clinic workflow is validated and the product needs durable multi-user database behavior, backups, concurrent access, migration tooling, or multiple clinics.
 
-## 2. High-Level Architecture
+WhatsApp is a later input channel. When added, it will call the same backend services used by the website.
 
-```text
-Patient WhatsApp
-      |
-      v
-Meta WhatsApp Business Platform
-      |
-      | verified webhook
-      v
-FastAPI Application
-  |       |       |       |
-  |       |       |       +--> Human handoff queue
-  |       |       +----------> Reminder and job worker
-  |       +------------------> PostgreSQL
-  +--------------------------> Staff dashboard API
-                                  |
-                                  v
-                         Clinic staff web dashboard
-```
-
-## 3. Main Components
-
-### 3.1 WhatsApp adapter
-
-The WhatsApp adapter handles provider authentication, outbound messages, inbound webhook payloads, message templates, interactive replies, delivery statuses, retries, and provider-specific identifiers.
-
-Provider-specific code must stay behind an internal interface. The business logic should not directly depend on raw Meta payloads.
-
-### 3.2 Webhook receiver
-
-The webhook endpoint must verify the provider challenge, authenticate webhook requests where applicable, validate payload structure, acknowledge quickly, and enqueue processing rather than performing long operations inside the HTTP request.
-
-Webhook processing must be idempotent. The same event may be delivered more than once. Store provider event identifiers and do not process an already completed event again.
-
-### 3.3 Conversation engine
-
-The conversation engine manages the patient’s current flow, such as choosing a doctor, selecting a service, choosing a date, selecting a slot, confirming, cancelling, or rescheduling.
-
-The engine should use explicit states and transitions. It should not rely on hidden model memory or unstructured text alone.
-
-### 3.4 Booking domain service
-
-The booking service owns availability, slot generation, temporary holds, appointment creation, cancellation, rescheduling, conflict detection, and status history.
-
-This service must be the only authority allowed to create or modify appointments. The chatbot and staff dashboard must call the same domain service.
-
-### 3.5 Staff dashboard API
-
-The dashboard API exposes authenticated operations for calendars, doctors, schedules, appointments, waitlists, conversations, staff takeover, and reports.
-
-Every query must be scoped to the authenticated clinic. Platform administrators require explicit elevated permissions and audit logging.
-
-### 3.6 Background job worker
-
-The worker handles reminders, retryable message sends, waitlist notifications, daily summaries, cleanup tasks, and scheduled follow-ups.
-
-Jobs must have unique keys, retry limits, backoff, status, and failure visibility. A reminder must not be sent twice because a worker restarted.
-
-### 3.7 PostgreSQL
-
-PostgreSQL is the source of truth for clinic configuration, schedules, appointments, conversations, consent, and audit history.
-
-Use migrations for every schema change. Do not modify production tables manually.
-
-## 4. Suggested Backend Modules
+## 2. First-Iteration Architecture
 
 ```text
-app/
-  main.py
-  config.py
-  database.py
-  dependencies.py
-  api/
-    auth.py
-    clinics.py
-    doctors.py
-    schedules.py
-    appointments.py
-    conversations.py
-    whatsapp.py
-    dashboard.py
-  domain/
-    booking.py
-    availability.py
-    conversations.py
-    permissions.py
-    reminders.py
-  integrations/
-    whatsapp/
-      client.py
-      schemas.py
-      webhook.py
-      templates.py
-    email/
-  models/
-  schemas/
-  repositories/
-  workers/
-  security/
-  observability/
-  tests/
+Clinic staff browser
+        |
+        v
+Staff website frontend
+        |
+        v
+FastAPI backend
+   |        |        |
+   |        |        +--> Authentication and permissions
+   |        +-----------> Workbook repository
+   |                         |
+   |                         v
+   |                   clinic_data.xlsx
+   |
+   +--> Appointment and availability services
+
+Future:
+Patient WhatsApp -> WhatsApp provider -> FastAPI webhook -> same services
 ```
 
-## 5. Core Data Model
+## 3. Important Excel Constraint
 
-The initial relational model should include:
+Excel is acceptable for a controlled prototype, not as the final multi-clinic production database.
 
-- `clinics`
-- `users`
-- `clinic_memberships`
-- `roles`
-- `doctors`
-- `patients`
-- `appointment_types`
-- `working_hours`
-- `doctor_leaves`
-- `availability_rules`
-- `appointments`
-- `appointment_status_history`
-- `waitlist_entries`
-- `conversations`
-- `messages`
-- `webhook_events`
-- `message_templates`
-- `reminder_jobs`
-- `consent_records`
-- `audit_logs`
+A workbook is vulnerable to concurrent writes, file corruption, accidental manual edits, weak access control, missing transactional guarantees, and deployment-storage problems. Therefore, the backend must be the only writer during the pilot. Staff may view or download the workbook, but they should not edit it while the website is running.
 
-All tenant-owned tables should contain `clinic_id`. Use foreign keys, unique constraints, indexes for common queries, and timestamps stored in UTC with the clinic timezone stored separately.
+Every workbook write must use a file lock, a temporary output file, validation, and an atomic replace operation. The system must create backups before important writes and maintain a recovery copy.
 
-## 6. Appointment Consistency
+If the website is deployed to a cloud environment, the workbook must be stored on persistent storage. Ephemeral local deployment storage is not acceptable for clinic records.
 
-Appointment creation must be transactional. The service must re-check availability at the moment of creation, not only when the slot is displayed.
+## 4. Components
 
-A safe flow is:
+### 4.1 Staff website
 
-1. Start a database transaction.
-2. Lock or reserve the relevant schedule range.
-3. Re-check doctor, service, leave, and existing appointments.
-4. Create the appointment with a unique business key.
-5. Write status history and audit log.
-6. Commit.
-7. Send confirmation asynchronously.
+The website provides authenticated forms, patient search, patient profiles, previous visits, dentist configuration, availability, calendar views, and appointment management.
 
-If confirmation fails after the appointment commits, the appointment remains visible and the message job is retried. Do not silently delete the appointment.
+The website must never read or write the workbook directly from the browser. All operations go through the FastAPI backend.
 
-## 7. Security Architecture
+### 4.2 FastAPI backend
 
-The system must use HTTPS, secure secret storage, short-lived authenticated sessions, role-based authorization, tenant checks, rate limits, validated inputs, safe database queries, controlled error responses, and encrypted backups.
+FastAPI is responsible for authentication, validation, clinic configuration, patient registration, visit records, dentist availability, appointment rules, workbook access, audit events, and future WhatsApp webhooks.
 
-Sensitive content should not be written to ordinary logs. Logs should use identifiers, event types, timestamps, and operational metadata instead.
+### 4.3 Workbook repository
 
-Use separate development, staging, and production environments. Never use real patient data in development or testing.
+The repository is the only component allowed to read or write the Excel file. It should expose application-level operations such as `create_patient`, `find_patient`, `add_visit`, `list_available_ranges`, and `create_appointment` rather than allowing arbitrary workbook edits from business code.
 
-## 8. Integration Boundaries
+Use `openpyxl` or an equivalent library. Keep workbook schema definitions in code and validate every sheet before saving.
 
-The application should isolate external services behind adapters:
+### 4.4 Future WhatsApp adapter
 
-| Integration | Internal responsibility |
+The WhatsApp adapter will receive patient input, normalize it into internal commands, and call the same patient, availability, and appointment services as the website.
+
+It must never write directly to the workbook because that would duplicate business rules and bypass validation.
+
+## 5. Workbook Design
+
+Use one workbook per clinic for the first pilot, not one workbook for all clinics.
+
+Recommended sheets:
+
+| Sheet | Purpose |
 |---|---|
-| WhatsApp provider | Send/receive messages and statuses |
-| Email provider | Optional staff notifications |
-| Payment provider | Optional payment collection |
-| AI provider | Optional intent extraction or FAQ assistance |
-| Object storage | Optional private documents |
-| Monitoring provider | Errors, metrics, and alerts |
+| `Patients` | One row per registered patient |
+| `Visits` | One row per previous or new visit summary |
+| `Dentists` | Dentist identity and status |
+| `Availability` | Working days, hours, breaks, and blocked periods |
+| `Appointments` | One row per appointment |
+| `Staff` | Staff accounts or imported staff reference |
+| `AuditLog` | Important changes and source of change |
+| `Metadata` | Schema version, clinic timezone, last backup, and workbook version |
 
-If the WhatsApp provider changes, the booking domain should not change.
+Use stable identifiers such as `PAT-000001`, `VIS-000001`, `DOC-000001`, and `APT-000001`. Do not use a patient’s name as a primary key.
 
-## 9. AI Boundary
+Use controlled values for statuses, such as `confirmed`, `pending`, `cancelled`, `rescheduled`, `completed`, and `no_show`.
 
-AI may classify an incoming message into a known administrative intent or draft a response from approved clinic content. AI may not create a booking without domain validation, override permissions, diagnose, prescribe, provide emergency triage, or modify clinic rules.
+## 6. Data Flow: Staff Website
 
-The safe sequence is:
+### Register patient
+
+1. Staff submits the form.
+2. FastAPI validates the fields.
+3. The service searches for a matching patient using configured rules.
+4. The system either creates a new stable patient identifier or asks staff to confirm a possible duplicate.
+5. The workbook repository writes the patient record.
+6. The system creates an audit event.
+7. The website displays the saved record.
+
+### Add previous visit
+
+1. Staff opens the patient profile.
+2. Staff enters a concise structured visit summary.
+3. FastAPI validates the patient identifier and fields.
+4. The workbook repository writes the visit row.
+5. The patient profile displays the new visit.
+
+### Book appointment
+
+1. Staff selects the patient.
+2. Staff selects a requested dentist or available dentist.
+3. The availability service reads dentist schedules, leave, breaks, and existing appointments.
+4. The service returns valid appointment ranges.
+5. Staff selects a range.
+6. The booking service re-checks availability.
+7. The workbook repository writes the appointment atomically under a file lock.
+8. The system writes an audit event.
+9. The website shows the confirmed appointment.
+
+## 7. Availability Logic
+
+Availability must be derived from:
+
+- Dentist working schedule.
+- Dentist leave or blocked time.
+- Clinic working hours.
+- Appointment duration.
+- Existing appointments.
+- Buffer time, if configured.
+- Clinic timezone.
+
+The first release may use predefined ranges such as 30-minute or 60-minute slots. Do not create a complicated scheduling engine until the clinic’s real appointment patterns are understood.
+
+If two or three dentists are available, the staff member may choose a specific dentist or select the first valid dentist according to the clinic’s approved rule. The product must show the dentist clearly before confirmation.
+
+## 8. Future WhatsApp Data Flow
 
 ```text
-Message -> intent extraction -> validated command -> domain rules -> database action -> response
+Patient sends WhatsApp message
+        -> provider webhook
+        -> FastAPI webhook handler
+        -> conversation normalizer
+        -> patient/availability/booking services
+        -> workbook repository during pilot
+        -> WhatsApp confirmation
 ```
 
-## 10. Deployment Environments
+After Supabase migration, only the repository changes. The product services should continue to use the same interfaces.
 
-### Local
+## 9. Future Supabase Migration
 
-Docker Compose may run FastAPI, PostgreSQL, Redis, and a local webhook tunnel.
+Supabase should be introduced when one or more of the following becomes true:
 
-### Staging
+- Multiple staff members need concurrent writes.
+- More than one clinic is active.
+- The workbook becomes too large or unreliable.
+- Reliable backups and audit history are required.
+- Staff need real-time schedule updates.
+- WhatsApp traffic becomes active.
+- The product needs production-grade authentication and row-level access control.
 
-Use a separate database, test WhatsApp number, test credentials, fake clinic data, automated migrations, and production-like configuration.
+The migration process should export workbook sheets into normalized tables, preserve stable identifiers, validate row counts, compare important records, and keep the original workbook as an archived snapshot.
 
-### Production
+## 10. Security Boundaries
 
-Use managed PostgreSQL, private secrets, HTTPS, backups, monitoring, job workers, deployment rollback, database migration checks, and documented incident response.
+The browser must never receive workbook file paths or secrets. The backend must validate every field and every clinic scope. Staff authentication, session protection, role permissions, and audit events are required even during the pilot.
 
-## 11. Reliability Requirements
+Do not store passwords in the workbook. Do not expose raw patient data through debug logs. Do not send the workbook through unencrypted email.
 
-The system should provide:
+## 11. Deployment Options
 
-- Health-check endpoints.
-- Structured logs.
-- Error tracking.
-- Webhook replay support.
-- Safe retry and idempotency.
-- Queue monitoring.
-- Backup verification.
-- Database migration rollback strategy.
-- Manual operational controls.
-- Clear failure messages to staff.
+### Local pilot
+
+Run FastAPI, the website, and the workbook on a clinic-owned or controlled computer. This is simplest for early iteration but requires local backup and availability procedures.
+
+### Controlled hosted pilot
+
+Run the backend and website on a server with persistent storage, encrypted access, scheduled backups, and one workbook per clinic. This is more convenient for staff but requires careful storage and recovery design.
+
+Do not deploy the workbook to ephemeral storage that can disappear during restart or redeploy.
 
 ## 12. Architecture Decisions
 
 | Decision | Choice | Reason |
 |---|---|---|
-| Backend | FastAPI | Efficient API development and strong typing through Pydantic |
-| Database | PostgreSQL | Reliable relational transactions and scheduling data integrity |
-| Initial shape | Modular monolith | Lower operational complexity for a small team |
-| Patient channel | WhatsApp | Low learning friction and existing patient familiarity |
-| Staff interface | Web dashboard | Better control for calendars, exceptions, and reporting |
-| Background work | Redis-backed worker | Reliable reminders and retries |
-| AI | Optional and constrained | Avoids unsafe autonomous clinical behavior |
-| Time handling | UTC plus clinic timezone | Prevents cross-timezone scheduling errors |
+| First user interface | Staff website | Validate the clinic workflow first |
+| First storage | One structured Excel workbook per clinic | Fast iteration and easy inspection/export |
+| Final storage direction | Supabase or PostgreSQL-backed system | Needed after validation and concurrent usage |
+| Backend | FastAPI | Clear typed API and Python ecosystem |
+| Future patient channel | WhatsApp | Add only after staff workflow works |
+| Appointment authority | FastAPI domain service | One source of scheduling rules |
+| Workbook access | Repository with lock and validation | Prevent direct uncontrolled edits |
+| Initial scale | One clinic | Reduce complexity and learn the workflow |
 
-## 13. Architecture Risks
+## 13. Main Risks
 
-The highest-risk areas are WhatsApp account onboarding, policy and pricing changes, provider outages, appointment concurrency, clinic-specific scheduling rules, patient-data handling, and staff adoption.
+The major risks are Excel corruption, simultaneous staff actions, cloud persistence, duplicate patient records, unclear previous-visit data, incorrect availability, and premature WhatsApp integration.
 
-Mitigate these risks with a test account, provider abstraction, automated concurrency tests, narrow initial scope, explicit human handoff, and real-clinic pilots before expansion.
+Mitigate them with one-clinic scope, backend-only workbook writes, stable identifiers, file locks, backups, explicit schema, validation, and a migration-ready repository boundary.

@@ -1,146 +1,161 @@
 # Implementation Phases
 
-## Operating Principle
+## Strategy
 
-Build the smallest reliable product that can prove a clinic will use and pay for the workflow. Do not build a broad platform before validating one repeated operational problem.
+Build and validate the clinic staff website first. Do not begin with WhatsApp or Supabase. The first proof must be that dental-clinic staff can register patients and book correct appointment ranges using the website.
 
-## Phase 0: Product Discovery
+## Phase 0: Confirm the Clinic Workflow
 
-**Objective:** Choose a narrow market and verify that the problem is real.
-
-**Activities:**
-
-- Choose one specialty and geography.
-- Interview clinic owners and receptionists.
-- Observe current booking and cancellation workflows.
-- Measure message volume, response time, no-shows, and cancellations.
-- Identify the person who can approve a purchase.
-- Define the pilot success metric.
-
-**Exit gate:** At least three clinics agree to pilot, and at least one expresses willingness to pay if the measured problem improves.
-
-## Phase 1: Concierge Prototype
-
-**Objective:** Test the workflow before investing in a complete system.
+**Objective:** Understand the real dental-clinic process before coding.
 
 **Activities:**
 
-- Create a clickable conversation prototype.
-- Simulate doctor and slot selection.
-- Manually support unusual requests behind the scenes.
-- Test the language, flow length, and human handoff.
-- Record real objections from clinics and patients.
+- Choose one dentist clinic as the first design partner.
+- Observe registration and appointment booking.
+- Identify the minimum patient and previous-visit fields.
+- Document how one, two, or three dentists are scheduled.
+- Document appointment duration, breaks, leave, and walk-ins.
+- Decide whether the clinic uses fixed appointment ranges or flexible slots.
+- Agree how staff will inspect or export the workbook.
 
-**Exit gate:** Patients can understand the flow, and receptionists agree that it solves repetitive work rather than creating more work.
+**Exit gate:** The clinic approves the first workflow, fields, availability rules, and pilot success measures.
 
-## Phase 2: Technical Foundation
+## Phase 1: Staff Website Prototype
 
-**Objective:** Build a reliable backend foundation.
+**Objective:** Prove that the staff can use the website without WhatsApp.
 
-**Activities:**
+**Build:**
 
-- Create the FastAPI application.
-- Add PostgreSQL and migrations.
-- Implement clinic, doctor, service, schedule, and appointment models.
-- Implement authentication and tenant isolation.
-- Implement deterministic availability and booking rules.
-- Add automated tests for conflicts and permissions.
+- Staff login.
+- Patient registration form.
+- Patient search.
+- Patient profile.
+- Previous-visit list and structured summary entry.
+- Dentist list.
+- Basic schedule and availability screen.
+- Appointment creation form.
 
-**Exit gate:** The backend can create, cancel, and reschedule appointments correctly under concurrent requests.
+At this stage, the interface may use test data or a local file. Focus on workflow clarity, not production infrastructure.
 
-## Phase 3: WhatsApp MVP
+**Exit gate:** Staff can register a patient, find the patient, review previous visits, and book an appointment range without developer assistance.
 
-**Objective:** Connect a test WhatsApp account and complete the core patient journey.
+## Phase 2: FastAPI and Excel Pilot Backend
 
-**Activities:**
+**Objective:** Make the website operational with controlled temporary storage.
 
-- Configure Meta or an approved provider.
-- Implement verified webhook receipt.
-- Add idempotent message processing.
-- Add doctor, service, date, and slot selection.
-- Add booking confirmation.
-- Add cancellation and rescheduling.
-- Add human handoff.
-- Add delivery-status tracking.
+**Build:**
 
-**Exit gate:** The full test flow works repeatedly without duplicate bookings or lost conversations.
+- FastAPI API.
+- Structured workbook schema.
+- One workbook per clinic.
+- Workbook repository using `openpyxl` or equivalent.
+- File lock and atomic write process.
+- Backup before writes.
+- Stable identifiers.
+- Patient, visits, dentists, availability, appointments, staff, metadata, and audit sheets.
+- Validation and error recovery.
 
-## Phase 4: Staff Dashboard
+**Exit gate:** Every successful website action produces a correct workbook record and every failed write is visible to staff.
 
-**Objective:** Give receptionists operational control.
+## Phase 3: Scheduling Reliability
 
-**Activities:**
+**Objective:** Make dentist availability and appointment booking trustworthy.
 
-- Add daily calendar.
-- Add doctor and status filters.
-- Add manual appointment controls.
-- Add schedule and leave management.
-- Add conversation queue.
-- Add staff takeover.
-- Add basic metrics.
+**Build:**
 
-**Exit gate:** A receptionist can operate the pilot without database access or developer assistance.
+- Working hours.
+- Dentist leave and blocked periods.
+- Breaks.
+- Appointment duration.
+- Fixed appointment ranges or approved slot rules.
+- Conflict detection.
+- Double-booking tests.
+- Cancellation and rescheduling.
+- Timezone handling.
+- Appointment status history.
 
-## Phase 5: Pilot and Reliability
+**Exit gate:** The system passes concurrent booking, duplicate submission, cancellation, rescheduling, and failed-write tests.
 
-**Objective:** Prove value with real clinics under controlled conditions.
+## Phase 4: Controlled Clinic Pilot
 
-**Activities:**
-
-- Onboard three pilot clinics.
-- Use clinic-approved configuration and consent language.
-- Monitor webhook, job, and message failures.
-- Measure automation rate, staff time saved, no-shows, and recovered cancellations.
-- Review patient confusion and staff complaints weekly.
-- Fix reliability problems before adding features.
-
-**Exit gate:** At least one clinic pays, clinics continue using the system, and the product demonstrates measurable operational value.
-
-## Phase 6: Commercial Readiness
-
-**Objective:** Make the product repeatably deployable and supportable.
+**Objective:** Use the website with one real dental clinic.
 
 **Activities:**
 
-- Add clinic onboarding flow.
-- Add subscription and usage tracking.
-- Document support procedures.
-- Add backup and restore verification.
-- Add audit review and security checks.
-- Add message-cost accounting.
-- Add product analytics.
-- Create a repeatable sales demo and case study.
+- Use clinic-approved fields and workflows.
+- Train staff.
+- Keep the current manual process as a fallback.
+- Monitor workbook backups and failures.
+- Record staff friction and missing requirements.
+- Measure time to register a patient and book an appointment.
+- Measure scheduling errors and staff adoption.
 
-**Exit gate:** A new clinic can be onboarded with a documented process and without custom engineering for every setup.
+**Exit gate:** Staff use the website repeatedly for at least two weeks and confirm that it is better than their current process.
 
-## Phase 7: Controlled Expansion
+## Phase 5: Decide on Supabase Migration
 
-**Objective:** Add features only when supported by evidence.
+**Objective:** Move beyond Excel only when evidence justifies it.
 
-**Priority order:**
+Migrate when multiple staff need concurrent writes, more than one clinic is active, workbook size or reliability becomes a problem, backups and access control need to be stronger, or the product is ready for WhatsApp traffic.
+
+**Migration activities:**
+
+- Freeze the workbook schema.
+- Export each sheet.
+- Normalize into tables.
+- Preserve stable identifiers.
+- Compare row counts and important records.
+- Run parallel verification.
+- Keep the original workbook as an archive.
+- Switch the repository implementation from Excel to Supabase.
+
+**Exit gate:** The same website workflow works against Supabase with verified data parity.
+
+## Phase 6: Add WhatsApp Patient Input
+
+**Objective:** Allow patients to submit appointment requests through WhatsApp.
+
+**Build:**
+
+- Official WhatsApp Business integration.
+- Verified webhook.
+- Patient opt-in and opt-out handling.
+- Patient identification or registration flow.
+- Preferred dentist selection.
+- Date or appointment-range selection.
+- Availability response.
+- Human handoff.
+- Confirmation and reminder templates.
+- Idempotent webhook processing.
+
+WhatsApp must call the same patient, availability, and appointment services as the staff website. It must not create a separate scheduling implementation.
+
+**Exit gate:** A WhatsApp request can become a staff-visible appointment without duplicate records or conflicting availability.
+
+## Phase 7: Productize and Expand
+
+**Objective:** Make onboarding repeatable and add only validated capabilities.
+
+Possible later capabilities:
 
 1. Waitlist and cancellation recovery.
 2. Follow-up reminders.
-3. Local-language support.
+3. Multiple dentists and locations.
 4. Payment links.
-5. Multi-location support.
-6. Consultation notes.
-7. Integrations with billing, laboratory, or practice-management tools.
-8. Constrained AI assistance for staff.
+5. Practice-management integrations.
+6. More detailed clinical records after proper review.
+7. Constrained staff-assistance AI.
 
-Do not expand into clinical decision support, prescriptions, or medical records without a separate product, safety, legal, and security review.
+Do not add diagnosis, prescription generation, or autonomous clinical decisions as ordinary roadmap items.
 
-## Decision Gates
+## Go/No-Go Gates
 
-| Gate | Continue when | Stop or pivot when |
+| Gate | Continue when | Stop or revise when |
 |---|---|---|
-| Discovery | Clinics repeat the same painful problem | Pain is vague or non-urgent |
-| Prototype | Users understand and complete the flow | Users need constant explanation |
-| MVP | Booking is reliable and staff can control it | Double bookings or lost conversations occur |
-| Pilot | Clinics use it repeatedly and measure value | Clinics praise it but do not use it |
-| Commercial | At least one customer pays and onboarding is repeatable | Every customer requires custom work |
-| Expansion | Existing customers request the same next capability | Features are driven only by speculation |
-
-## Release Discipline
-
-Every phase must produce a short decision record containing the result, evidence, unresolved risks, and the next approved step. Never move forward only because development work has already been done.
+| Workflow | Staff agree on the real process | Requirements remain unclear |
+| Website prototype | Staff complete the core tasks | They need constant developer help |
+| Excel pilot | Writes and backups are reliable | Records are lost or frequently corrupted |
+| Clinic pilot | Staff use it repeatedly | Staff return immediately to the old process |
+| Supabase migration | Concurrent usage or reliability justifies it | Excel is sufficient and migration adds no value |
+| WhatsApp | Website workflow is stable | Website rules still change frequently |
+| Expansion | Customers repeatedly request the same capability | Features are based only on speculation |
