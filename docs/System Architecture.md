@@ -24,30 +24,37 @@ Supabase is intentionally deferred. It will be introduced when multi-user concur
 +------------------------------------------------------------------------+
 |                          FastAPI Backend                               |
 |                                                                        |
-|  [ Controllers / Routers ]                                             |
-|  - /api/patients       (Registration, Search, Profile)                 |
-|  - /api/visits         (Structured Visit History)                      |
-|  - /api/dentists       (Dentist Profile, Schedule, Leaves)             |
-|  - /api/appointments   (Booking, Rescheduling, Cancellation)           |
-|  - /api/availability   (Slot Calculation Engine)                       |
-|  - /api/patient-request(Simulator Endpoint -> WhatsApp Webhook Target) |
+|  [ Dedicated Routes Layer (app/api/v1/routes/) ]                       |
+|  - /api/v1/patients       (Registration, Duplicate Check, Search)     |
+|  - /api/v1/patients/...   (Structured Visit History)                  |
+|  - /api/v1/dentists       (Dentist Profile, Schedule, Leaves)         |
+|  - /api/v1/availability   (Available Slots Engine)                    |
+|  - /api/v1/appointments   (Booking, Reschedule, Payment, Reminder)    |
+|  - /api/v1/treatments     (Procedure Catalog)                         |
+|  - /api/v1/checkups       (Odontogram & 4-Step Clinical Checkup)      |
+|  - /api/v1/patient-requests(Simulator Intake & Staff Review Queue)    |
 |                                                                        |
-|  [ Domain Services (Single Source of Business Truth) ]                 |
+|  [ Controllers Layer (app/controllers/) ]                              |
+|  - Thin orchestration translating HTTP params into domain calls        |
+|                                                                        |
+|  [ Domain Services Layer (app/services/) ]                             |
 |  - Patient Service (Duplicate detection, field validation)             |
 |  - Availability Service (Working hours - Leaves - Breaks - Booked)     |
-|  - Appointment Service (Atomic slot locking & confirmation)            |
+|  - Booking Service (Atomic slot locking, payments, confirmation)       |
+|  - Patient Request Service (Simulator matching, review, approval)      |
 |                                                                        |
-|  [ Excel Repository Boundary ]                                         |
+|  [ Repositories Layer (app/repositories/) ]                            |
+|  - Base Repository Interfaces (base.py)                                |
 |  - OS-Level FileLock (clinic_data.xlsx.lock)                           |
 |  - Lock-Once-Delegate Pattern (Eliminating re-entrant deadlocks)       |
-|  - Atomic Write: Temp File -> Validate -> os.replace()                 |
-|  - Pre-Write Automated Rolling Backups                                 |
+|  - Atomic Write: Temp File (.tmp) -> Validate -> os.replace()          |
+|  - Pre-Write Automated Rolling Backups (data/backups/)                 |
 +-----------------------------------+------------------------------------+
                                     |
                                     v openpyxl
                          +----------------------+
                          |   clinic_data.xlsx   |
-                         |   (9 Structured      |
+                         |   (12 Structured     |
                          |       Sheets)        |
                          +----------------------+
 
@@ -63,51 +70,34 @@ Future WhatsApp Evolution:
                                                       [ Supabase / PostgreSQL ]
 ```
 
-## 3. Core Components
+## 3. Core Components & Layered Separation
 
-### 3.1 Staff Website
-- Authenticated interface for clinic receptionists and dentists.
-- Key screens: Daily Schedule Dashboard, Patient Registration & Search, Patient Profiles with Previous Visits, Dentist Availability & Leave Management, Appointment Booking & Rescheduling.
-- **Strict Boundary:** The browser communicates exclusively via FastAPI REST endpoints. Direct browser access to the Excel workbook is strictly prohibited.
+The backend adheres to a strict physical separation of concerns across dedicated folders:
 
-### 3.2 Patient Request Simulator
-- An external testing interface simulating the patient's perspective in the absence of a live WhatsApp number.
-- Collects: Patient Name, Phone, Requested Dentist, Preferred Date/Time, and Appointment Reason.
-- Submits structured JSON payloads to `/api/patient-request` (or shared appointment endpoints).
-- Demonstrates how external patient input flows through availability checking and booking, appearing on the staff website in real time.
-- Serves as a direct drop-in placeholder that will be replaced by the WhatsApp webhook adapter in Phase 9.
+1. **`app/api/v1/routes/` (Routes Folder):** Pure route declarations, HTTP verbs, paths, status codes, and OpenAPI documentation tags. Delegates directly to controllers.
+2. **`app/controllers/` (Controllers Folder):** Unpacks HTTP query/body parameters, coordinates application services, and serializes response payloads.
+3. **`app/services/` (Services Folder):** Houses pure domain rules and business logic (slot calculation, duplicate detection, atomic booking confirmation, patient request conversion).
+4. **`app/models/` (Models Folder):** Contains pure Pydantic schemas, value objects, request/response models, and status enums. Zero HTTP or storage code.
+5. **`app/repositories/` (Repositories Folder):** Contains abstract persistence interfaces (`base.py`), Excel sheet schemas (`excel_schema.py`), and thread/process-safe OpenPyXL storage (`excel_repository.py`).
+6. **`app/shared/` & `app/core/` (Shared Folder):** Cross-cutting concerns including `X-Request-ID` tracing middleware, machine-readable error codes, and configuration.
+7. **`app/infrastructure/` (Infrastructure Folder):** Clean boundary adapters and interfaces for future WhatsApp (Phase 9) and Supabase (Phase 8).
+8. **`scripts/` (Scripts Folder):** Standalone CLI tools to seed, validate, snapshot, and reset workbook storage.
 
-### 3.3 FastAPI Backend & Domain Services
-- **Single Authority for Business Rules:** Availability calculation and appointment booking logic reside strictly in the domain services layer (`app/services/availability_service.py` and `app/services/appointment_service.py`).
-- Ensures identical scheduling, validation, and conflict-prevention rules regardless of whether a request originates from the Staff Website, Patient Request Simulator, or future WhatsApp webhook.
-- Strict Pydantic models validate all inputs and outputs.
+## 4. Workbook Schema (12 Sheets)
 
-### 3.4 Workbook Repository (Excel Pilot Storage)
-- Encapsulates all interactions with `clinic_data.xlsx`.
-- Employs the **Lock-Once-Delegate pattern**: public repository methods acquire a `filelock.FileLock` once, perform all required reads/writes in-memory, and delegate to private `_unlocked` helper functions to avoid re-entrant deadlocks.
-- Provides atomic persistence: writes to a temporary file (`.tmp`), validates sheet headers and records, creates a timestamped backup (`backups/`), and atomically replaces the live file using `os.replace()`.
-
-### 3.5 Future WhatsApp Webhook Adapter (Phase 9)
-- Will receive incoming messages from the official WhatsApp Business Platform.
-- Normalizes incoming chat interactions into structured internal commands.
-- Calls the identical FastAPI domain services used by the simulator. Never accesses storage directly.
-
-### 3.6 Future Supabase Repository (Phase 8)
-- Replaces `ExcelRepository` with `PostgresRepository` behind the repository interface.
-- Zero changes to controllers or domain services when transitioning from Excel to Supabase.
-
-## 4. Workbook Schema (9 Sheets)
-
-One workbook per clinic (`clinic_data.xlsx`), organized into 9 normalized sheets:
+One workbook per clinic (`clinic_data.xlsx`), organized into 12 normalized sheets:
 
 | Sheet | Purpose | Primary Identifier Format | Key Fields |
 |---|---|---|---|
-| `Patients` | Patient records | `PAT-000001` | `patient_id`, `name`, `age`, `dob`, `phone`, `email`, `created_at` |
+| `Patients` | Patient records | `PAT-000001` | `patient_id`, `name`, `age`, `dob`, `phone`, `email`, `gender`, `address`, `allergies`, `medical_conditions`, `created_at` |
 | `Visits` | Structured past visit summaries | `VIS-000001` | `visit_id`, `patient_id`, `dentist_id`, `visit_date`, `visit_type`, `summary` |
 | `Dentists` | Dentist profiles | `DOC-000001` | `dentist_id`, `name`, `specialty`, `is_active` |
 | `Availability` | Weekly schedule rules | Row index | `dentist_id`, `day_of_week`, `start_time`, `end_time`, `break_start`, `break_end`, `slot_duration` |
 | `Leaves` | Blocked dates / leaves | Row index | `dentist_id`, `date`, `reason` |
-| `Appointments` | Scheduled appointments | `APT-000001` | `appointment_id`, `patient_id`, `dentist_id`, `date`, `start_time`, `end_time`, `status` |
+| `Appointments` | Scheduled appointments | `APT-000001` | `appointment_id`, `patient_id`, `dentist_id`, `date`, `start_time`, `end_time`, `status`, `treatment_name`, `source`, `payment_status`, `bill_number`, `clinical_notes` |
+| `Treatments` | Clinical procedure catalog | `TRT-000001` | `treatment_id`, `name`, `category`, `default_duration_minutes`, `estimated_cost`, `description` |
+| `MedicalCheckups` | 4-step odontogram & examination | `CHK-000001` | `checkup_id`, `appointment_id`, `patient_id`, `dentist_id`, `vitals`, `teeth_findings_json`, `oral_conditions_json`, `plan_agreement_notes` |
+| `PatientRequests` | Simulator & WhatsApp intake | `REQ-000001` | `request_id`, `patient_name`, `patient_phone`, `patient_age`, `dentist_id`, `preferred_date`, `preferred_start_time`, `preferred_end_time`, `status`, `review_notes`, `appointment_id` |
 | `Staff` | Internal staff accounts | `STF-000001` | `staff_id`, `username`, `role`, `is_active` |
 | `AuditLog` | Auditable state changes | `AUD-000001` | `audit_id`, `entity_type`, `entity_id`, `action`, `performed_by`, `timestamp` |
 | `Metadata` | Schema version & clinic info | Single row | `schema_version`, `clinic_name`, `timezone`, `last_updated` |

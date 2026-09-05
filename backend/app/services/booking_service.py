@@ -87,3 +87,25 @@ class BookingService:
         if not updated:
             raise ResourceNotFoundError("Appointment", appointment_id)
         return updated
+
+    def update_payment(
+        self,
+        appointment_id: str,
+        payment_status: str,
+        bill_number: Optional[str] = None
+    ) -> AppointmentResponse:
+        updated = self.repository.update_payment_status(
+            appointment_id=appointment_id,
+            payment_status=payment_status,
+            bill_number=bill_number
+        )
+        if not updated:
+            raise ResourceNotFoundError("Appointment", appointment_id)
+        return updated
+
+    def send_payment_reminder(self, appointment_id: str):
+        reminder = self.repository.send_payment_reminder(appointment_id)
+        if not reminder:
+            raise ResourceNotFoundError("Appointment", appointment_id)
+        return reminder
+

@@ -89,3 +89,5 @@ This document serves as the long-term memory for the DentalFlow project, recordi
 | Revision 1 | Transition to Website First | Pivoted to clinic staff website with Excel storage; deferred WhatsApp & Supabase. |
 | Revision 2 | Backend & Lock Architecture | Built complete FastAPI MVC backend; fixed filelock re-entrancy with `_unlocked` helpers; 10/10 tests green. |
 | Revision 3 | Simulator-First Integration | Added Patient Request Simulator to compensate for absence of dedicated WhatsApp number; aligned roadmap to 9 distinct phases. |
+| Revision 4 | UI Photos Backend Alignment | Expanded backend for clinical checkup wizard (vitals, 32-tooth odontogram, canker sores, informed consent), procedure catalog (`Treatments`), and appointment billing/payment tracking; expanded workbook to 11 sheets. |
+| Revision 5 | Proper Layered Architecture | Reorganized backend into strict dedicated layers (app/api/v1/routes, app/controllers, app/services, app/models, app/repositories, app/shared, app/infrastructure, scripts); added Patient Request Simulator module with REQ-XXXXXX IDs and 12th workbook sheet; added Request-ID tracing middleware. |

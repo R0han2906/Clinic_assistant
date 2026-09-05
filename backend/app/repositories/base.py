@@ -129,7 +129,61 @@ class BaseClinicRepository(ABC):
     ) -> Optional[AppointmentResponse]:
         pass
 
+    # Treatments Catalog
+    @abstractmethod
+    def list_treatments(self) -> List[Any]:
+        pass
+
+    # Payment & Reminders
+    @abstractmethod
+    def update_payment_status(
+        self, appointment_id: str, payment_status: str, bill_number: Optional[str] = None
+    ) -> Optional[AppointmentResponse]:
+        pass
+
+    @abstractmethod
+    def send_payment_reminder(self, appointment_id: str) -> Optional[Any]:
+        pass
+
+    # Medical Checkups & Odontogram
+    @abstractmethod
+    def save_medical_checkup(self, checkup_data: Any) -> Any:
+        pass
+
+    @abstractmethod
+    def get_medical_checkup(self, checkup_id: str) -> Optional[Any]:
+        pass
+
+    @abstractmethod
+    def get_checkup_by_appointment(self, appointment_id: str) -> Optional[Any]:
+        pass
+
+    @abstractmethod
+    def list_checkups_for_patient(self, patient_id: str) -> List[Any]:
+        pass
+
+    # Patient Requests (Simulator / WhatsApp)
+    @abstractmethod
+    def create_patient_request(self, request_data: Any) -> Any:
+        pass
+
+    @abstractmethod
+    def get_patient_request(self, request_id: str) -> Optional[Any]:
+        pass
+
+    @abstractmethod
+    def list_patient_requests(self, status: Optional[str] = None) -> List[Any]:
+        pass
+
+    @abstractmethod
+    def update_patient_request_status(
+        self, request_id: str, status: str, review_notes: Optional[str] = None, appointment_id: Optional[str] = None
+    ) -> Optional[Any]:
+        pass
+
     # Audit Logging
     @abstractmethod
     def log_audit_event(self, entry: AuditLogEntry) -> None:
         pass
+
+

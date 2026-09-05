@@ -1,7 +1,8 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status, Body
 from app.models.appointment import (
-    AppointmentCreate, AppointmentReschedule, AppointmentResponse, AppointmentStatus
+    AppointmentCreate, AppointmentReschedule, AppointmentResponse, AppointmentStatus,
+    PaymentStatusUpdate, PaymentReminderResponse
 )
 from app.services import get_booking_service, BookingService
 
@@ -80,3 +81,28 @@ def complete_appointment(
 ):
     """Marks an appointment as completed."""
     return booking_service.complete_appointment(appointment_id, notes=notes)
+
+@router.patch("/{appointment_id}/payment", response_model=AppointmentResponse)
+def update_payment(
+    appointment_id: str,
+    payload: PaymentStatusUpdate,
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """Updates bill number and payment status (e.g. UNPAID, PAID, WAITING_PAYMENT)."""
+    return booking_service.update_payment(
+        appointment_id=appointment_id,
+        payment_status=payload.payment_status,
+        bill_number=payload.bill_number
+    )
+
+@router.post("/{appointment_id}/remind-payment", response_model=PaymentReminderResponse)
+def remind_payment(
+    appointment_id: str,
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """
+    Triggers a payment reminder to the patient's phone/email for unpaid bills.
+    Records the reminder event in the audit log.
+    """
+    return booking_service.send_payment_reminder(appointment_id)
+

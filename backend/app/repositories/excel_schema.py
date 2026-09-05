@@ -11,6 +11,9 @@ SHEET_APPOINTMENTS = "Appointments"
 SHEET_STAFF = "Staff"
 SHEET_AUDIT = "AuditLog"
 SHEET_METADATA = "Metadata"
+SHEET_CHECKUPS = "MedicalCheckups"
+SHEET_TREATMENTS = "Treatments"
+SHEET_PATIENT_REQUESTS = "PatientRequests"
 
 ALL_SHEETS = [
     SHEET_PATIENTS,
@@ -21,14 +24,18 @@ ALL_SHEETS = [
     SHEET_APPOINTMENTS,
     SHEET_STAFF,
     SHEET_AUDIT,
-    SHEET_METADATA
+    SHEET_METADATA,
+    SHEET_CHECKUPS,
+    SHEET_TREATMENTS,
+    SHEET_PATIENT_REQUESTS
 ]
 
 # Column definitions for each sheet
 SHEET_COLUMNS: Dict[str, List[str]] = {
     SHEET_PATIENTS: [
         "patient_id", "full_name", "dob_or_age", "phone", "email",
-        "emergency_contact", "consent_status", "created_at", "updated_at"
+        "emergency_contact", "gender", "address", "allergies", "medical_conditions",
+        "consent_status", "created_at", "updated_at"
     ],
     SHEET_VISITS: [
         "visit_id", "patient_id", "visit_date", "dentist_id",
@@ -48,7 +55,25 @@ SHEET_COLUMNS: Dict[str, List[str]] = {
     ],
     SHEET_APPOINTMENTS: [
         "appointment_id", "patient_id", "dentist_id", "date",
-        "start_time", "end_time", "status", "reason", "notes",
+        "start_time", "end_time", "treatment_name", "source",
+        "payment_status", "bill_number", "clinical_notes",
+        "status", "reason", "notes", "created_at", "updated_at"
+    ],
+    SHEET_CHECKUPS: [
+        "checkup_id", "patient_id", "appointment_id", "dentist_id",
+        "blood_pressure", "medical_conditions", "allergies", "oral_hygiene_habits",
+        "teeth_findings_json", "canker_sores", "canker_sores_notes",
+        "anomalous_teeth", "anomalous_teeth_notes", "other_oral_notes",
+        "consent_status", "refusal_reason", "status", "created_at", "updated_at"
+    ],
+    SHEET_TREATMENTS: [
+        "treatment_id", "name", "category", "default_duration_minutes",
+        "estimated_cost", "description"
+    ],
+    SHEET_PATIENT_REQUESTS: [
+        "request_id", "patient_name", "patient_phone", "patient_age", "patient_id",
+        "dentist_id", "preferred_date", "preferred_start_time", "preferred_end_time",
+        "reason", "source", "status", "review_notes", "appointment_id",
         "created_at", "updated_at"
     ],
     SHEET_STAFF: [
@@ -112,3 +137,63 @@ DEFAULT_METADATA = [
     {"key": "slot_duration_minutes", "value": "30", "updated_at": datetime.now().isoformat()},
     {"key": "workbook_version", "value": "1", "updated_at": datetime.now().isoformat()}
 ]
+
+DEFAULT_TREATMENTS = [
+    {
+        "treatment_id": "TRT-001",
+        "name": "Tooth Scaling",
+        "category": "Preventive",
+        "default_duration_minutes": 30,
+        "estimated_cost": 120.0,
+        "description": "Ultrasonic scaling and tartar removal to maintain periodontal health."
+    },
+    {
+        "treatment_id": "TRT-002",
+        "name": "General Checkup",
+        "category": "Diagnostic",
+        "default_duration_minutes": 30,
+        "estimated_cost": 50.0,
+        "description": "Comprehensive clinical and visual dental checkup."
+    },
+    {
+        "treatment_id": "TRT-003",
+        "name": "Bleaching",
+        "category": "Cosmetic",
+        "default_duration_minutes": 60,
+        "estimated_cost": 250.0,
+        "description": "Professional in-clinic laser or chemical tooth bleaching."
+    },
+    {
+        "treatment_id": "TRT-004",
+        "name": "Dental Extraction",
+        "category": "Surgery",
+        "default_duration_minutes": 45,
+        "estimated_cost": 150.0,
+        "description": "Safe extraction of diseased, impacted, or unrestorable teeth."
+    },
+    {
+        "treatment_id": "TRT-005",
+        "name": "Tooth Filling (Composite)",
+        "category": "Restorative",
+        "default_duration_minutes": 45,
+        "estimated_cost": 180.0,
+        "description": "Tooth-colored composite resin restoration for cavities and caries."
+    },
+    {
+        "treatment_id": "TRT-006",
+        "name": "Root Canal Treatment",
+        "category": "Endodontics",
+        "default_duration_minutes": 60,
+        "estimated_cost": 350.0,
+        "description": "Pulp extirpation, cleaning, and obturation for infected root canals."
+    },
+    {
+        "treatment_id": "TRT-007",
+        "name": "Crown & Bridge",
+        "category": "Prosthodontics",
+        "default_duration_minutes": 60,
+        "estimated_cost": 500.0,
+        "description": "Zirconia or porcelain crown fabrication for damaged teeth."
+    }
+]
+

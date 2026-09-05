@@ -5,6 +5,7 @@ from app.services.dentist_service import DentistService
 from app.services.availability_service import AvailabilityService
 from app.services.booking_service import BookingService
 from app.services.audit_service import AuditService
+from app.services.patient_request_service import PatientRequestService
 
 def get_patient_service() -> PatientService:
     return PatientService(get_repository())
@@ -23,3 +24,7 @@ def get_booking_service() -> BookingService:
 
 def get_audit_service() -> AuditService:
     return AuditService(get_repository())
+
+def get_patient_request_service() -> PatientRequestService:
+    return PatientRequestService(get_repository())
+

@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List
 from pydantic import BaseModel
 
 class Settings(BaseModel):
@@ -8,6 +9,7 @@ class Settings(BaseModel):
     CLINIC_NAME: str = "SmileCare Dental Clinic"
     TIMEZONE: str = "Asia/Kolkata"
     DEFAULT_SLOT_DURATION_MINUTES: int = 30
+    CORS_ORIGINS: List[str] = ["*"]
     
     # Storage Paths
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
