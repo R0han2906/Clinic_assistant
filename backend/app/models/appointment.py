@@ -26,6 +26,7 @@ class AppointmentCreate(BaseModel):
     clinical_notes: Optional[str] = Field(None, description="Concise clinical summary banner shown in drawer")
     reason: Optional[str] = Field(None, description="Primary reason for visit e.g. Checkup, Toothache")
     notes: Optional[str] = Field(None, description="Additional administrative notes")
+    booking_time: Optional[str] = Field(None, description="Exact timestamp when booking was created/recorded")
 
 class AppointmentReschedule(BaseModel):
     new_dentist_id: Optional[str] = Field(None, description="Optionally switch dentist")
@@ -67,5 +68,6 @@ class AppointmentResponse(BaseModel):
     status: AppointmentStatus
     reason: Optional[str] = None
     notes: Optional[str] = None
+    booking_time: Optional[str] = None
     created_at: str
     updated_at: str

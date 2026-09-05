@@ -94,3 +94,25 @@ def test_simulator_unavailable_slot_conflict(client):
     }
     res = client.post("/api/v1/patient-requests", json=req_payload)
     assert res.status_code == status.HTTP_409_CONFLICT
+
+
+def test_simulator_patient_request_cancellation(client):
+    """Verifies cancelling a simulator patient request before or after approval."""
+    req_payload = {
+        "patient_name": "Kavita Reddy",
+        "patient_phone": "+91 9876500099",
+        "dentist_id": "DOC-000001",
+        "preferred_date": "2026-09-17",
+        "preferred_start_time": "14:00",
+        "preferred_end_time": "14:30",
+        "reason": "Teeth cleaning"
+    }
+    create_res = client.post("/api/v1/patient-requests", json=req_payload)
+    assert create_res.status_code == status.HTTP_201_CREATED
+    req_id = create_res.json()["request_id"]
+
+    cancel_res = client.post(f"/api/v1/patient-requests/{req_id}/cancel", json={"review_notes": "Cancelled by patient"})
+    assert cancel_res.status_code == status.HTTP_200_OK
+    assert cancel_res.json()["status"] == "cancelled"
+    assert cancel_res.json()["review_notes"] == "Cancelled by patient"
+

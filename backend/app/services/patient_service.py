@@ -1,6 +1,6 @@
 from typing import List, Optional
 from app.repositories.base import BaseClinicRepository
-from app.models.patient import PatientCreate, PatientResponse, DuplicateCheckResult
+from app.models.patient import PatientCreate, PatientUpdate, PatientResponse, DuplicateCheckResult
 from app.core.exceptions import ResourceNotFoundError, DuplicatePatientWarning
 
 class PatientService:
@@ -57,3 +57,17 @@ class PatientService:
                 )
 
         return self.repository.create_patient(patient_data)
+
+    def update_patient(self, patient_id: str, updates: PatientUpdate) -> PatientResponse:
+        """
+        Updates profile/contact details for an existing patient.
+        """
+        patient = self.repository.get_patient(patient_id)
+        if not patient:
+            raise ResourceNotFoundError("Patient", patient_id)
+
+        update_dict = updates.model_dump(exclude_unset=True)
+        updated = self.repository.update_patient(patient_id, update_dict)
+        if not updated:
+            raise ResourceNotFoundError("Patient", patient_id)
+        return updated

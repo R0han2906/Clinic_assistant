@@ -8,6 +8,7 @@ class PatientRequestStatus(str, Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     CONVERTED = "converted"
+    CANCELLED = "cancelled"
 
 
 class PatientRequestBase(BaseModel):
@@ -36,5 +37,6 @@ class PatientRequestResponse(PatientRequestBase):
     status: PatientRequestStatus = PatientRequestStatus.PENDING
     review_notes: Optional[str] = None
     appointment_id: Optional[str] = None
+    booking_time: Optional[str] = None
     created_at: str
     updated_at: str

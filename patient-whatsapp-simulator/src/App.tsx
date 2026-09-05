@@ -22,6 +22,8 @@ import { ReviewCard } from './components/ReviewCard';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { HumanHandoffCard } from './components/HumanHandoffCard';
 import { ManageExistingAptCard } from './components/ManageExistingAptCard';
+import { UpdatePatientCard } from './components/UpdatePatientCard';
+import { CancelAppointmentCard } from './components/CancelAppointmentCard';
 import { Calendar, RefreshCw, Headset, XCircle, UserPlus, UserCheck } from 'lucide-react';
 
 export function App() {
@@ -466,20 +468,91 @@ export function App() {
                   pushStep('select_dentist');
                   addBotMessage('Select your preferred dentist for your new appointment:', 'select_dentist');
                 }}
-                onCancelExisting={async () => {
-                  addPatientMessage('Cancel upcoming appointment');
-                  if (isBackendOnline && matchedExistingRecord.upcomingAppointment?.referenceCode) {
-                    await apiClient.cancelAppointment(
-                      matchedExistingRecord.upcomingAppointment.referenceCode,
-                      'Patient requested cancellation'
-                    );
-                  }
-                  addBotMessage(
-                    `Cancellation request logged for ${matchedExistingRecord.upcomingAppointment?.referenceCode || 'appointment'}. Reception staff will process this.`,
-                    'manage_existing_apt'
-                  );
+                onCancelExisting={() => {
+                  pushStep('cancel_appointment_confirm');
+                  addBotMessage('Please select a cancellation reason and confirm below:', 'cancel_appointment_confirm');
+                }}
+                onEditDetails={() => {
+                  pushStep('edit_patient_details');
+                  addBotMessage('You can update your contact and profile details below:', 'edit_patient_details');
                 }}
                 onRestart={handleRestart}
+              />
+            )}
+
+            {currentStep === 'edit_patient_details' && matchedExistingRecord && (
+              <UpdatePatientCard
+                patientRecord={matchedExistingRecord}
+                onSave={async (updates) => {
+                  setIsSubmitting(true);
+                  if (isBackendOnline && matchedExistingRecord.patientId && !matchedExistingRecord.patientId.includes('PENDING')) {
+                    await apiClient.updatePatient(matchedExistingRecord.patientId, updates);
+                  }
+                  setMatchedExistingRecord((prev) => prev ? {
+                    ...prev,
+                    fullName: updates.fullName,
+                    phone: updates.phone,
+                    ageOrDob: updates.ageOrDob,
+                    address: updates.address,
+                    emergencyContact: updates.emergencyContact,
+                  } : null);
+                  setPatientDetails((prev) => ({
+                    ...prev,
+                    fullName: updates.fullName,
+                    phone: updates.phone,
+                    ageOrDob: updates.ageOrDob,
+                    address: updates.address,
+                    emergencyContact: updates.emergencyContact,
+                  }));
+                  setIsSubmitting(false);
+                  addPatientMessage(`Updated my contact information to: ${updates.phone}`);
+                  addBotMessage(
+                    `Your profile details have been successfully updated in DentalFlow clinic records!`,
+                    'manage_existing_apt'
+                  );
+                  pushStep('manage_existing_apt');
+                }}
+                onCancel={() => {
+                  pushStep('manage_existing_apt');
+                  addBotMessage('Returned to appointment management.', 'manage_existing_apt');
+                }}
+                isSubmitting={isSubmitting}
+              />
+            )}
+
+            {currentStep === 'cancel_appointment_confirm' && matchedExistingRecord && (
+              <CancelAppointmentCard
+                patientRecord={matchedExistingRecord}
+                onConfirmCancel={async (reason) => {
+                  setIsSubmitting(true);
+                  const refCode = matchedExistingRecord.upcomingAppointment?.referenceCode;
+                  if (isBackendOnline && refCode) {
+                    await apiClient.cancelAppointment(refCode, reason);
+                  }
+                  // Update record status to cancelled
+                  setMatchedExistingRecord((prev) => {
+                    if (!prev || !prev.upcomingAppointment) return prev;
+                    return {
+                      ...prev,
+                      upcomingAppointment: {
+                        ...prev.upcomingAppointment,
+                        status: 'cancelled',
+                      },
+                    };
+                  });
+                  setIsSubmitting(false);
+                  addPatientMessage(`Cancel appointment. Reason: ${reason}`);
+                  addBotMessage(
+                    `Your appointment (${refCode || 'booking'}) has been successfully cancelled. The dental time slot has been released. You can book another appointment anytime!`,
+                    'manage_existing_apt'
+                  );
+                  pushStep('manage_existing_apt');
+                }}
+                onKeepAppointment={() => {
+                  pushStep('manage_existing_apt');
+                  addBotMessage('Your appointment remains confirmed.', 'manage_existing_apt');
+                }}
+                isSubmitting={isSubmitting}
               />
             )}
 

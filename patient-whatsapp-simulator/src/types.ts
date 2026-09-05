@@ -8,6 +8,8 @@ export type StepState =
   | 'collect_reason'
   | 'existing_patient_lookup'
   | 'existing_patient_confirm'
+  | 'edit_patient_details'
+  | 'cancel_appointment_confirm'
   | 'select_dentist'
   | 'select_date'
   | 'select_time_range'
@@ -62,6 +64,8 @@ export interface PatientDetails {
   fullName: string;
   ageOrDob: string;
   phone: string;
+  address?: string;
+  emergencyContact?: string;
   reason?: string;
   treatmentName?: string;
 }
@@ -81,6 +85,8 @@ export interface ExistingPatientRecord {
   fullName: string;
   phone: string;
   ageOrDob: string;
+  address?: string;
+  emergencyContact?: string;
   lastVisitDate: string;
   lastVisitType: string;
   upcomingAppointment?: {
@@ -88,5 +94,6 @@ export interface ExistingPatientRecord {
     dentistName: string;
     date: string;
     time: string;
+    status?: string; // 'confirmed', 'pending', 'cancelled'
   };
 }

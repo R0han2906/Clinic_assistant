@@ -110,6 +110,7 @@ export const apiClient = {
               dentistName: req.dentist_id,
               date: req.preferred_date,
               time: `${req.preferred_start_time} – ${req.preferred_end_time}`,
+              status: req.status || 'pending',
             },
           };
         }
@@ -132,6 +133,8 @@ export const apiClient = {
               fullName: p.full_name,
               phone: p.phone,
               ageOrDob: p.dob_or_age,
+              address: p.address,
+              emergencyContact: p.emergency_contact,
               lastVisitDate: p.updated_at ? p.updated_at.split('T')[0] : 'N/A',
               lastVisitType: 'Routine Consultation',
               upcomingAppointment: {
@@ -139,6 +142,7 @@ export const apiClient = {
                 dentistName: apt.dentist_name,
                 date: apt.date,
                 time: `${apt.start_time} – ${apt.end_time}`,
+                status: apt.status || 'confirmed',
               },
             };
           }
@@ -155,13 +159,38 @@ export const apiClient = {
     if (!raw || raw.length === 0) return null;
 
     const first = raw[0];
+    let upcomingApt = undefined;
+
+    // Check for active appointments for this patient
+    try {
+      const aptRes = await fetch(`${API_BASE_URL}/appointments?patient_id=${encodeURIComponent(first.patient_id)}`);
+      if (aptRes.ok) {
+        const apts: any[] = await aptRes.json();
+        const activeApt = apts.find((a) => a.status === 'confirmed' || a.status === 'registered' || a.status === 'pending');
+        if (activeApt) {
+          upcomingApt = {
+            referenceCode: activeApt.appointment_id,
+            dentistName: activeApt.dentist_name,
+            date: activeApt.date,
+            time: `${activeApt.start_time} – ${activeApt.end_time}`,
+            status: activeApt.status,
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return {
       patientId: first.patient_id,
       fullName: first.full_name,
       phone: first.phone,
       ageOrDob: first.dob_or_age,
+      address: first.address,
+      emergencyContact: first.emergency_contact,
       lastVisitDate: first.updated_at ? first.updated_at.split('T')[0] : 'N/A',
       lastVisitType: 'Routine Consultation',
+      upcomingAppointment: upcomingApt,
     };
   },
 
@@ -310,15 +339,84 @@ export const apiClient = {
   },
 
   /**
-   * Cancel an appointment in the backend.
+   * Cancel an appointment or patient request in the backend.
+   * Handles both APT-XXXXXX and REQ-XXXXXX.
    */
-  async cancelAppointment(appointmentId: string, reason?: string): Promise<boolean> {
-    const res = await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(appointmentId)}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: reason || 'Cancelled via WhatsApp Simulator' }),
-    });
+  async cancelAppointment(
+    referenceCode: string,
+    reason?: string
+  ): Promise<{ success: boolean; status?: string }> {
+    const trimmed = referenceCode.trim().toUpperCase();
+    const cancelReason = reason || 'Cancelled via WhatsApp Simulator';
 
-    return res.ok;
+    // If it's a Patient Request (REQ-XXXXXX)
+    if (trimmed.startsWith('REQ-')) {
+      try {
+        let res = await fetch(`${API_BASE_URL}/v1/patient-requests/${encodeURIComponent(trimmed)}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ review_notes: cancelReason }),
+        });
+        if (!res.ok) {
+          res = await fetch(`${API_BASE_URL}/patient-requests/${encodeURIComponent(trimmed)}/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ review_notes: cancelReason }),
+          });
+        }
+        return { success: res.ok, status: 'cancelled' };
+      } catch {
+        return { success: false };
+      }
+    }
+
+    // Otherwise it's a confirmed Appointment (APT-XXXXXX)
+    try {
+      const res = await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(trimmed)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      return { success: res.ok, status: 'cancelled' };
+    } catch {
+      return { success: false };
+    }
+  },
+
+  /**
+   * Update existing patient details in the backend.
+   */
+  async updatePatient(
+    patientId: string,
+    updates: {
+      fullName?: string;
+      phone?: string;
+      ageOrDob?: string;
+      address?: string;
+      emergencyContact?: string;
+    }
+  ): Promise<{ success: boolean; data?: any }> {
+    const payload: any = {};
+    if (updates.fullName) payload.full_name = updates.fullName;
+    if (updates.phone) payload.phone = updates.phone;
+    if (updates.ageOrDob) payload.dob_or_age = updates.ageOrDob;
+    if (updates.address) payload.address = updates.address;
+    if (updates.emergencyContact) payload.emergency_contact = updates.emergencyContact;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/patients/${encodeURIComponent(patientId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to update patient profile');
+      }
+      const data = await res.json();
+      return { success: true, data };
+    } catch {
+      return { success: false };
+    }
   },
 };

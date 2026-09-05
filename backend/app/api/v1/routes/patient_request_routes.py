@@ -57,3 +57,14 @@ def reject_patient_request(
     """Reject a pending patient request with optional staff notes."""
     notes = review.review_notes if review else None
     return service.reject_request(request_id, review_notes=notes)
+
+@router.post("/{request_id}/cancel", response_model=PatientRequestResponse, status_code=status.HTTP_200_OK)
+def cancel_patient_request(
+    request_id: str,
+    review: Optional[PatientRequestReview] = None,
+    service: PatientRequestService = Depends(get_patient_request_service)
+):
+    """Cancel a patient request directly (from simulator or patient request)."""
+    notes = review.review_notes if review else None
+    return service.cancel_request(request_id, reason=notes)
+

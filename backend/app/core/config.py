@@ -21,6 +21,9 @@ class Settings(BaseModel):
     # Concurrency & Lock settings
     LOCK_TIMEOUT_SECONDS: float = 10.0
 
+    # Backup settings (False prevents generating a new .xlsx file on each save)
+    AUTO_BACKUP_ON_SAVE: bool = False
+
 settings = Settings()
 
 # Ensure directories exist

@@ -101,3 +101,67 @@ def test_api_availability_and_appointment_flow(client):
     assert resched_res.status_code == status.HTTP_200_OK
     assert resched_res.json()["status"] == "rescheduled"
     assert resched_res.json()["date"] == "2026-09-08"
+
+def test_update_patient_details(client):
+    """Verifies updating patient contact and demographic details via PATCH."""
+    # Register patient
+    reg_res = client.post("/api/patients", json={
+        "full_name": "Vikram Seth",
+        "dob_or_age": "35",
+        "phone": "+91 9887766554"
+    })
+    p_id = reg_res.json()["patient_id"]
+
+    # Update patient details
+    update_res = client.patch(f"/api/patients/{p_id}", json={
+        "phone": "+91 9999988888",
+        "address": "Flat 4B, Lotus Apartments",
+        "allergies": "Sulfa drugs"
+    })
+    assert update_res.status_code == status.HTTP_200_OK
+    data = update_res.json()
+    assert data["phone"] == "+91 9999988888"
+    assert data["address"] == "Flat 4B, Lotus Apartments"
+    assert data["allergies"] == "Sulfa drugs"
+    assert data["full_name"] == "Vikram Seth"
+
+def test_cancel_appointment_endpoint(client):
+    """Verifies appointment cancellation endpoint."""
+    p_res = client.post("/api/patients", json={
+        "full_name": "Meera Patel",
+        "dob_or_age": "29",
+        "phone": "+91 9776655443"
+    })
+    p_id = p_res.json()["patient_id"]
+
+    apt_res = client.post("/api/appointments", json={
+        "patient_id": p_id,
+        "dentist_id": "DOC-000001",
+        "date": "2026-09-12",
+        "start_time": "14:00",
+        "end_time": "14:30",
+        "reason": "Teeth whitening"
+    })
+    apt_id = apt_res.json()["appointment_id"]
+
+    cancel_res = client.post(f"/api/appointments/{apt_id}/cancel", json={"reason": "Patient conflict"})
+    assert cancel_res.status_code == status.HTTP_200_OK
+    assert cancel_res.json()["status"] == "cancelled"
+
+def test_cancel_patient_request_endpoint(client):
+    """Verifies patient request cancellation endpoint."""
+    req_res = client.post("/api/v1/patient-requests", json={
+        "patient_name": "Rohan Sen",
+        "patient_phone": "+91 9112233445",
+        "patient_age": "40",
+        "dentist_id": "DOC-000001",
+        "preferred_date": "2026-09-15",
+        "preferred_start_time": "10:00",
+        "preferred_end_time": "10:30",
+        "reason": "Checkup"
+    })
+    req_id = req_res.json()["request_id"]
+
+    cancel_res = client.post(f"/api/v1/patient-requests/{req_id}/cancel", json={"review_notes": "Cancelled by patient"})
+    assert cancel_res.status_code == status.HTTP_200_OK
+    assert cancel_res.json()["status"] == "cancelled"

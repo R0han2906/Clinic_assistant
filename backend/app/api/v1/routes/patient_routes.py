@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from app.models.patient import PatientCreate, PatientResponse, DuplicateCheckResult
+from app.models.patient import PatientCreate, PatientUpdate, PatientResponse, DuplicateCheckResult
 from app.services import get_patient_service, PatientService
 from app.core.exceptions import DuplicatePatientWarning
 
@@ -53,3 +53,16 @@ def get_patient_profile(
 ):
     """Retrieves patient details by patient identifier (e.g. PAT-000001)."""
     return patient_service.get_patient_by_id(patient_id)
+
+@router.patch("/{patient_id}", response_model=PatientResponse)
+@router.put("/{patient_id}", response_model=PatientResponse)
+def update_patient_profile(
+    patient_id: str,
+    updates: PatientUpdate,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """
+    Updates profile, demographics, and contact details for an existing patient.
+    """
+    return patient_service.update_patient(patient_id, updates)
+

@@ -142,3 +142,29 @@ class PatientRequestService:
             status=PatientRequestStatus.REJECTED.value,
             review_notes=notes
         )
+
+    def cancel_request(
+        self, request_id: str, reason: Optional[str] = None
+    ) -> PatientRequestResponse:
+        """
+        Patient or staff cancels a request.
+        If it was already approved with an associated appointment, cancels that appointment as well.
+        """
+        req = self.get_request(request_id)
+        if req.status == PatientRequestStatus.CANCELLED:
+            return req
+
+        if req.appointment_id:
+            try:
+                self.booking_service.cancel_appointment(
+                    req.appointment_id, reason=reason or "Request cancelled by patient"
+                )
+            except Exception:
+                pass
+
+        notes = reason or "Cancelled by patient."
+        return self.repository.update_patient_request_status(
+            request_id=request_id,
+            status=PatientRequestStatus.CANCELLED.value,
+            review_notes=notes
+        )

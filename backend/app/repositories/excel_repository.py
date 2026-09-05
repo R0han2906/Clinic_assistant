@@ -51,20 +51,49 @@ class ExcelClinicRepository(BaseClinicRepository):
     This eliminates all re-entrant lock deadlock scenarios.
     """
 
-    def __init__(self, workbook_path: Optional[Path] = None, backup_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        workbook_path: Optional[Path] = None,
+        backup_dir: Optional[Path] = None,
+        auto_backup: Optional[bool] = None,
+    ):
         self.workbook_path = Path(workbook_path or settings.WORKBOOK_PATH).resolve()
         self.backup_dir = Path(backup_dir or settings.BACKUP_DIR).resolve()
         self.lock_path = self.workbook_path.parent / f"{self.workbook_path.name}.lock"
+        self.auto_backup = (
+            auto_backup
+            if auto_backup is not None
+            else getattr(settings, "AUTO_BACKUP_ON_SAVE", False)
+        )
         self.initialize_storage()
 
     # =========================================================================
     # INITIALIZATION & HEALTH
     # =========================================================================
 
+    def purge_redundant_backups(self) -> int:
+        """Removes orphaned auto-generated backup files from the backup directory."""
+        removed = 0
+        if self.backup_dir.exists():
+            for f in self.backup_dir.glob("clinic_data_20*.xlsx"):
+                try:
+                    f.unlink()
+                    removed += 1
+                except Exception:
+                    pass
+            for f in self.backup_dir.glob("pre_reset_backup_*.xlsx"):
+                try:
+                    f.unlink()
+                    removed += 1
+                except Exception:
+                    pass
+        return removed
+
     def initialize_storage(self) -> None:
         """Creates and formats the Excel workbook if it does not already exist."""
         self.workbook_path.parent.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.purge_redundant_backups()
         with get_workbook_lock(self.lock_path):
             if not self.workbook_path.exists():
                 self._create_fresh_workbook()
@@ -147,8 +176,8 @@ class ExcelClinicRepository(BaseClinicRepository):
 
     def _save_workbook_atomic(self, wb: openpyxl.Workbook) -> None:
         """
-        Saves the workbook to a temp file, creates a timestamped backup if the
-        original exists, then atomically replaces the original.
+        Saves the workbook to a temp file, atomically replaces the original.
+        Only creates a timestamped backup if self.auto_backup is explicitly True.
         Always called from within an existing lock — no lock acquired here.
         """
         temp_path = self.workbook_path.with_name(
@@ -158,7 +187,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             wb.save(temp_path)
             wb.close()
 
-            if self.workbook_path.exists():
+            if self.auto_backup and self.workbook_path.exists():
                 self.backup_dir.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 backup_file = self.backup_dir / f"clinic_data_{timestamp}.xlsx"
@@ -173,6 +202,17 @@ class ExcelClinicRepository(BaseClinicRepository):
                 except Exception:
                     pass
             raise WorkbookWriteError(f"Failed to atomically save workbook: {str(e)}")
+
+    def create_manual_backup(self) -> Path:
+        """Creates an explicit, intentional timestamped backup of clinic_data.xlsx in backup_dir."""
+        with get_workbook_lock(self.lock_path):
+            if not self.workbook_path.exists():
+                raise WorkbookWriteError("Cannot create backup: clinic_data.xlsx does not exist.")
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = self.backup_dir / f"clinic_data_backup_{timestamp}.xlsx"
+            shutil.copy2(self.workbook_path, backup_file)
+            return backup_file
 
     def _read_all_sheets(self) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -795,6 +835,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 status=apt_status,
                 reason=r.get("reason") or None,
                 notes=r.get("notes") or None,
+                booking_time=r.get("booking_time") or r.get("created_at", ""),
                 created_at=r.get("created_at", ""),
                 updated_at=r.get("updated_at", "")
             ))
@@ -842,6 +883,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             seq = self._next_sequence(apt_rows, "appointment_id")
             apt_id = f"APT-{seq:06d}"
             now_iso = datetime.now().isoformat()
+            booking_timestamp = appointment_data.booking_time or now_iso
             treatment = appointment_data.treatment_name or "General Checkup"
             bill_ref = appointment_data.bill_number or f"Bill #{10100 + seq}"
 
@@ -852,6 +894,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "date": appointment_data.date,
                 "start_time": appointment_data.start_time,
                 "end_time": appointment_data.end_time,
+                "booking_time": booking_timestamp,
                 "treatment_name": treatment,
                 "source": appointment_data.source or "MANUAL APPOINTMENT",
                 "payment_status": appointment_data.payment_status or "UNPAID",
@@ -904,6 +947,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             status=AppointmentStatus.CONFIRMED,
             reason=appointment_data.reason,
             notes=appointment_data.notes,
+            booking_time=booking_timestamp,
             created_at=now_iso,
             updated_at=now_iso
         )
@@ -1319,6 +1363,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             status=PatientRequestStatus(str(row.get("status", "pending"))),
             review_notes=str(row["review_notes"]) if row.get("review_notes") else None,
             appointment_id=str(row["appointment_id"]) if row.get("appointment_id") else None,
+            booking_time=str(row.get("booking_time") or row.get("created_at", "")),
             created_at=str(row.get("created_at", datetime.now().isoformat())),
             updated_at=str(row.get("updated_at", datetime.now().isoformat()))
         )
@@ -1341,6 +1386,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "preferred_date": request_data.preferred_date,
                 "preferred_start_time": request_data.preferred_start_time,
                 "preferred_end_time": request_data.preferred_end_time,
+                "booking_time": now_iso,
                 "reason": request_data.reason or "",
                 "source": request_data.source or "simulator",
                 "status": PatientRequestStatus.PENDING.value,

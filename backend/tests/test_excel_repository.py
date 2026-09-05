@@ -13,8 +13,8 @@ def test_workbook_initialization(temp_repo):
     for sheet_name in ALL_SHEETS:
         assert sheet_name in wb.sheetnames
 
-def test_patient_creation_and_atomic_backup(temp_repo):
-    """Verifies patient creation, stable ID generation, and automatic backup generation."""
+def test_patient_creation_single_file_no_redundant_backups(temp_repo):
+    """Verifies patient creation and ensures NO redundant backup .xlsx files are created on save."""
     p_data = PatientCreate(
         full_name="Rahul Sharma",
         dob_or_age="32",
@@ -24,18 +24,24 @@ def test_patient_creation_and_atomic_backup(temp_repo):
     patient = temp_repo.create_patient(p_data)
     assert patient.patient_id == "PAT-000001"
     assert patient.full_name == "Rahul Sharma"
+    assert patient.created_at is not None
 
     # Verify retrieval
     retrieved = temp_repo.get_patient("PAT-000001")
     assert retrieved is not None
     assert retrieved.full_name == "Rahul Sharma"
 
-    # Verify backup exists
+    # Verify that NO backup files were generated during normal writes
     backups = list(temp_repo.backup_dir.glob("*.xlsx"))
-    assert len(backups) >= 1
+    assert len(backups) == 0
+
+    # Verify manual backup works explicitly when called
+    manual_backup = temp_repo.create_manual_backup()
+    assert manual_backup.exists()
+    assert len(list(temp_repo.backup_dir.glob("*.xlsx"))) == 1
 
 def test_appointment_booking_and_conflict_prevention(temp_repo):
-    """Verifies appointment booking and prevents double booking under lock."""
+    """Verifies appointment booking, timestamps (booking_time & created_at), and conflict prevention."""
     # Create patient
     p = temp_repo.create_patient(PatientCreate(
         full_name="Sunita Verma",
@@ -55,6 +61,8 @@ def test_appointment_booking_and_conflict_prevention(temp_repo):
     apt = temp_repo.create_appointment(apt_data)
     assert apt.appointment_id == "APT-000001"
     assert apt.status == AppointmentStatus.CONFIRMED
+    assert apt.created_at is not None
+    assert apt.booking_time is not None
 
     # Attempt to book overlapping time on same dentist -> Should raise SlotConflictError
     with pytest.raises(SlotConflictError):

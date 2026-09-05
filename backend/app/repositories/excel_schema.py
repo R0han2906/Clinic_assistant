@@ -55,7 +55,7 @@ SHEET_COLUMNS: Dict[str, List[str]] = {
     ],
     SHEET_APPOINTMENTS: [
         "appointment_id", "patient_id", "dentist_id", "date",
-        "start_time", "end_time", "treatment_name", "source",
+        "start_time", "end_time", "booking_time", "treatment_name", "source",
         "payment_status", "bill_number", "clinical_notes",
         "status", "reason", "notes", "created_at", "updated_at"
     ],
@@ -73,7 +73,7 @@ SHEET_COLUMNS: Dict[str, List[str]] = {
     SHEET_PATIENT_REQUESTS: [
         "request_id", "patient_name", "patient_phone", "patient_age", "patient_id",
         "dentist_id", "preferred_date", "preferred_start_time", "preferred_end_time",
-        "reason", "source", "status", "review_notes", "appointment_id",
+        "booking_time", "reason", "source", "status", "review_notes", "appointment_id",
         "created_at", "updated_at"
     ],
     SHEET_STAFF: [

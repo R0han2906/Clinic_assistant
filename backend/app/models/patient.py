@@ -17,6 +17,18 @@ class PatientBase(BaseModel):
 class PatientCreate(PatientBase):
     force_create: bool = Field(False, description="If true, bypasses duplicate warning and creates new record")
 
+class PatientUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, description="Updated full legal or preferred name")
+    dob_or_age: Optional[str] = Field(None, description="Updated date of birth or age")
+    phone: Optional[str] = Field(None, min_length=7, description="Updated primary phone number")
+    email: Optional[str] = Field(None, description="Updated contact email")
+    emergency_contact: Optional[str] = Field(None, description="Updated emergency contact")
+    gender: Optional[str] = Field(None, description="Updated gender")
+    address: Optional[str] = Field(None, description="Updated full address")
+    allergies: Optional[str] = Field(None, description="Updated allergies")
+    medical_conditions: Optional[str] = Field(None, description="Updated systemic conditions")
+    consent_status: Optional[str] = Field(None, description="Updated consent status")
+
 class PatientResponse(PatientBase):
     patient_id: str
     created_at: str
