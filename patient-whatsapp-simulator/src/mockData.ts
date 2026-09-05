@@ -1,4 +1,39 @@
-import type { Dentist, ExistingPatientRecord, TimeSlot } from './types';
+import type { Dentist, ExistingPatientRecord, TimeSlot, Treatment } from './types';
+
+export const mockTreatments: Treatment[] = [
+  {
+    id: 'TRT-000001',
+    name: 'Teeth Checkup',
+    category: 'General',
+    defaultDurationMinutes: 30,
+    estimatedCost: 50.0,
+    description: 'Comprehensive routine oral and dental examination',
+  },
+  {
+    id: 'TRT-000002',
+    name: 'Dental Braces',
+    category: 'Orthodontics',
+    defaultDurationMinutes: 60,
+    estimatedCost: 2500.0,
+    description: 'Orthodontic alignment consultation and fitting',
+  },
+  {
+    id: 'TRT-000003',
+    name: 'Scaling & Polishing',
+    category: 'Preventive',
+    defaultDurationMinutes: 30,
+    estimatedCost: 120.0,
+    description: 'Professional plaque removal and tooth polishing',
+  },
+  {
+    id: 'TRT-000004',
+    name: 'Teeth Whitening',
+    category: 'Cosmetic',
+    defaultDurationMinutes: 45,
+    estimatedCost: 350.0,
+    description: 'In-office tooth shade brightening treatment',
+  },
+];
 
 export const mockDentists: Dentist[] = [
   {

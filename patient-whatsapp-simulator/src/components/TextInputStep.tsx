@@ -1,12 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { User, Calendar, Phone, FileText, ArrowRight, AlertCircle, Mic, MicOff, Loader2 } from 'lucide-react';
-import type { StepState } from '../types';
+import { User, Calendar, Phone, FileText, ArrowRight, AlertCircle, Mic, MicOff, Loader2, Sparkles } from 'lucide-react';
+import type { StepState, Treatment } from '../types';
 
 interface TextInputStepProps {
   currentStep: StepState;
   onSubmitValue: (val: string, step: StepState) => void;
   initialValue?: string;
   disabled?: boolean;
+  treatments?: Treatment[];
 }
 
 // Minimal typing for Web Speech API (not in all TS lib versions)
@@ -24,6 +25,7 @@ export const TextInputStep: React.FC<TextInputStepProps> = ({
   onSubmitValue,
   initialValue = '',
   disabled = false,
+  treatments = [],
 }) => {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +207,33 @@ export const TextInputStep: React.FC<TextInputStepProps> = ({
         <div className="voice-processing-bar">
           <Loader2 size={14} className="spin-icon" />
           <span>Processing voice input…</span>
+        </div>
+      )}
+      {/* Treatment quick-selection chips */}
+      {currentStep === 'collect_reason' && (
+        <div className="treatment-chips-container">
+          <div className="chips-header">
+            <Sparkles size={13} />
+            <span>Select a procedure or type/speak below:</span>
+          </div>
+          <div className="chips-flex">
+            {(treatments.length > 0
+              ? treatments.map((t) => t.name)
+              : ['Teeth Checkup', 'Scaling & Polishing', 'Tooth Pain', 'Dental Braces', 'Teeth Whitening']
+            ).map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`treatment-chip ${value === name ? 'chip-active' : ''}`}
+                onClick={() => {
+                  setValue(name);
+                  setError(null);
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

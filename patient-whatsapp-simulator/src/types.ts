@@ -47,6 +47,15 @@ export interface TimeSlot {
   unavailableReason?: string;
 }
 
+export interface Treatment {
+  id: string;
+  name: string;
+  category: string;
+  defaultDurationMinutes: number;
+  estimatedCost: number;
+  description: string;
+}
+
 export interface PatientDetails {
   isExisting: boolean;
   patientId?: string; // PAT-XXXXXX
@@ -54,6 +63,7 @@ export interface PatientDetails {
   ageOrDob: string;
   phone: string;
   reason?: string;
+  treatmentName?: string;
 }
 
 export interface AppointmentRequest {
@@ -61,7 +71,7 @@ export interface AppointmentRequest {
   dentist: Dentist;
   date: string;
   timeSlot: TimeSlot;
-  referenceCode: string;   // APT-XXXXXX (or DEMO-XXXXXX in mock mode)
+  referenceCode: string;   // REQ-XXXXXX (or REQ-DEMO-XXXXXX in mock mode)
   patientId?: string;      // PAT-XXXXXX — use this to look up the patient later
   createdTimestamp: string;
 }

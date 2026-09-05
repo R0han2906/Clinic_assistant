@@ -572,6 +572,56 @@ body {
   line-height: 1.4;
 }
 
+/* ── Treatment procedure chips ── */
+.treatment-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.chips-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.chips-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.treatment-chip {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: var(--text-main);
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.treatment-chip:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.treatment-chip.chip-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
 
 
 /* Dentist Picker Grid */
@@ -742,6 +792,34 @@ body {
   background: var(--secondary-light);
   padding: 6px 10px;
   border-radius: 6px;
+}
+
+.slot-count-badge.no-avail-badge {
+  color: var(--danger);
+  background: var(--danger-light);
+}
+
+.no-availability-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff5f5;
+  border: 1px dashed #fca5a5;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.no-avail-text {
+  font-size: 0.84rem;
+  color: #991b1b;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.no-avail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .slots-grid {

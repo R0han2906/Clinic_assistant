@@ -1,4 +1,4 @@
-import type { Dentist, TimeSlot, ExistingPatientRecord, PatientDetails } from './types';
+import type { Dentist, TimeSlot, ExistingPatientRecord, PatientDetails, Treatment } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
@@ -84,12 +84,39 @@ export const apiClient = {
   },
 
   /**
-   * Search for existing patient by phone, name, PAT-XXXXXX, or APT-XXXXXX.
-   * If an APT-XXXXXX id is passed, we first resolve the appointment to get
-   * the patient_id, then fetch the patient record.
+   * Search for existing patient by phone, name, PAT-XXXXXX, APT-XXXXXX, or REQ-XXXXXX.
    */
   async searchPatient(query: string): Promise<ExistingPatientRecord | null> {
     const trimmed = query.trim();
+
+    // If user entered a Request ID (REQ-XXXXXX)
+    if (/^REQ-\d+$/i.test(trimmed)) {
+      try {
+        let reqRes = await fetch(`${API_BASE_URL}/v1/patient-requests/${encodeURIComponent(trimmed.toUpperCase())}`);
+        if (!reqRes.ok) {
+          reqRes = await fetch(`${API_BASE_URL}/patient-requests/${encodeURIComponent(trimmed.toUpperCase())}`);
+        }
+        if (reqRes.ok) {
+          const req = await reqRes.json();
+          return {
+            patientId: req.patient_id || 'PENDING',
+            fullName: req.patient_name,
+            phone: req.patient_phone,
+            ageOrDob: req.patient_age,
+            lastVisitDate: req.created_at ? req.created_at.split('T')[0] : 'N/A',
+            lastVisitType: 'Requested via Simulator',
+            upcomingAppointment: {
+              referenceCode: req.request_id,
+              dentistName: req.dentist_id,
+              date: req.preferred_date,
+              time: `${req.preferred_start_time} – ${req.preferred_end_time}`,
+            },
+          };
+        }
+      } catch {
+        // fall through
+      }
+    }
 
     // If user entered an appointment ID, resolve through the appointment
     if (/^APT-\d+$/i.test(trimmed)) {
@@ -138,6 +165,22 @@ export const apiClient = {
     };
   },
 
+  /**
+   * Fetch treatments catalog from backend.
+   */
+  async getTreatments(): Promise<Treatment[]> {
+    const res = await fetch(`${API_BASE_URL}/treatments`);
+    if (!res.ok) throw new Error('Failed to fetch treatments from backend');
+    const raw: any[] = await res.json();
+    return raw.map((t) => ({
+      id: t.treatment_id,
+      name: t.name,
+      category: t.category,
+      defaultDurationMinutes: t.default_duration_minutes,
+      estimatedCost: t.estimated_cost,
+      description: t.description,
+    }));
+  },
 
   /**
    * Register a new patient in the FastAPI backend Excel database.
@@ -174,6 +217,57 @@ export const apiClient = {
 
     const data = await res.json();
     return data.patient_id;
+  },
+
+  /**
+   * Submit a Patient Booking Request via POST /api/v1/patient-requests
+   */
+  async submitPatientRequest(params: {
+    patientName: string;
+    patientPhone: string;
+    patientAge?: string;
+    dentistId: string;
+    preferredDate: string;
+    preferredStartTime: string;
+    preferredEndTime: string;
+    reason?: string;
+  }): Promise<{ requestId: string; status: string }> {
+    const payload = {
+      patient_name: params.patientName,
+      patient_phone: params.patientPhone,
+      patient_age: params.patientAge || '30',
+      dentist_id: params.dentistId === 'DOC-ANY' ? 'DOC-000001' : params.dentistId,
+      preferred_date: params.preferredDate,
+      preferred_start_time: params.preferredStartTime,
+      preferred_end_time: params.preferredEndTime,
+      reason: params.reason || 'Dental Consultation',
+      source: 'simulator',
+    };
+
+    let res = await fetch(`${API_BASE_URL}/v1/patient-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      res = await fetch(`${API_BASE_URL}/patient-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail?.message || err.detail || 'Failed to submit patient request to backend');
+    }
+
+    const data = await res.json();
+    return {
+      requestId: data.request_id,
+      status: data.status,
+    };
   },
 
   /**

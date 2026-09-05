@@ -16,7 +16,8 @@ export const ConfirmationCard: React.FC<ConfirmationCardProps> = ({
   const [copiedApt, setCopiedApt] = React.useState(false);
   const [copiedPat, setCopiedPat] = React.useState(false);
 
-  const isRealBackendApt = request.referenceCode.startsWith('APT-');
+  const isRealBackendReq = request.referenceCode.startsWith('REQ-') || request.referenceCode.startsWith('APT-');
+  const isMock = request.referenceCode.includes('DEMO');
 
   const handleCopyApt = () => {
     navigator.clipboard.writeText(request.referenceCode);
@@ -37,23 +38,25 @@ export const ConfirmationCard: React.FC<ConfirmationCardProps> = ({
       <div className="confirmation-badge-header">
         <CheckCircle2 size={36} className="success-icon" />
         <h2 className="confirmation-title">
-          {isRealBackendApt ? 'Appointment Saved to Clinic DB!' : 'Demo Appointment Recorded!'}
+          {isRealBackendReq && !isMock
+            ? 'Patient Request Recorded in Clinic System!'
+            : 'Demo Request Recorded (Simulated)!'}
         </h2>
         <p className="confirmation-subtitle">
-          {isRealBackendApt
-            ? 'Your booking is live in the clinic Excel database.'
-            : 'Your simulated booking request has been logged.'}
+          {isRealBackendReq && !isMock
+            ? 'Your booking request is logged for front-desk staff review.'
+            : 'Your simulated booking request has been generated.'}
         </p>
       </div>
 
-      {/* Appointment ID */}
+      {/* Request Reference ID */}
       <div className="ref-code-box">
         <span className="ref-label">
-          {isRealBackendApt ? 'Appointment ID (APT):' : 'Simulated Reference Code:'}
+          {isRealBackendReq && !isMock ? 'Request Reference ID (REQ):' : 'Simulated Reference Code:'}
         </span>
         <div className="ref-code-value">
           <code>{request.referenceCode}</code>
-          <button onClick={handleCopyApt} className="copy-code-btn" title="Copy appointment ID">
+          <button onClick={handleCopyApt} className="copy-code-btn" title="Copy reference ID">
             <Copy size={14} />
             {copiedApt ? 'Copied!' : 'Copy'}
           </button>
@@ -65,7 +68,7 @@ export const ConfirmationCard: React.FC<ConfirmationCardProps> = ({
         <div className="ref-code-box patient-id-box">
           <span className="ref-label">
             <User size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Your Patient ID (PAT) — use this to look up your record:
+            Your Patient ID (PAT):
           </span>
           <div className="ref-code-value">
             <code className="patient-id-code">{request.patientId}</code>
@@ -75,7 +78,7 @@ export const ConfirmationCard: React.FC<ConfirmationCardProps> = ({
             </button>
           </div>
           <p className="pat-hint">
-            Use your <strong>Patient ID</strong>, <strong>phone number</strong>, or your <strong>APT ID</strong> to look up your record next time you visit.
+            Use your <strong>Request ID (REQ)</strong>, <strong>Patient ID (PAT)</strong>, or <strong>phone number</strong> to look up your status in the simulator.
           </p>
         </div>
       )}
@@ -86,30 +89,36 @@ export const ConfirmationCard: React.FC<ConfirmationCardProps> = ({
           <span className="row-val">{request.patient.fullName} ({request.patient.phone})</span>
         </div>
         <div className="summary-row">
-          <span className="row-label">Dentist:</span>
+          <span className="row-label">Preferred Dentist:</span>
           <span className="row-val">{request.dentist.name}</span>
         </div>
         <div className="summary-row">
-          <span className="row-label">Date:</span>
+          <span className="row-label">Preferred Date:</span>
           <span className="row-val">{request.date}</span>
         </div>
         <div className="summary-row">
-          <span className="row-label">Time Window:</span>
+          <span className="row-label">Requested Slot:</span>
           <span className="row-val">{request.timeSlot.startTime} – {request.timeSlot.endTime}</span>
         </div>
+        {request.patient.reason && (
+          <div className="summary-row">
+            <span className="row-label">Visit Reason:</span>
+            <span className="row-val">{request.patient.reason}</span>
+          </div>
+        )}
       </div>
 
-      {/* Disclaimer */}
+      {/* Simulation Boundary Disclaimer */}
       <div className="disclaimer-callout">
         {isBackendOnline ? <Database size={16} className="disclaimer-icon" /> : <AlertTriangle size={16} className="disclaimer-icon" />}
         <p className="disclaimer-text">
           {isBackendOnline ? (
             <>
-              <strong>Live DB Sync:</strong> This appointment (<code>{request.referenceCode}</code>) is saved in <code>clinic_data.xlsx</code>. Staff will see it immediately on the dashboard.
+              <strong>Live DB Sync:</strong> Request <code>{request.referenceCode}</code> has been submitted to the clinic backend (<code>clinic_data.xlsx</code>). Reception staff will see it on their web dashboard for review.
             </>
           ) : (
             <>
-              <strong>Prototype Note:</strong> In production, this would sync to the Clinic Staff Website and front-desk staff would confirm the appointment.
+              <strong>Simulation Boundary Note:</strong> In the full system, clinic staff review incoming patient WhatsApp requests on their staff website dashboard and confirm availability.
             </>
           )}
         </p>

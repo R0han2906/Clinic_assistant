@@ -7,8 +7,9 @@ import type {
   TimeSlot,
   AppointmentRequest,
   ExistingPatientRecord,
+  Treatment,
 } from './types';
-import { mockDentists, mockExistingPatients } from './mockData';
+import { mockDentists, mockExistingPatients, mockTreatments } from './mockData';
 import { apiClient } from './apiClient';
 import { SimulationNotice } from './components/SimulationNotice';
 import { ChatHeader } from './components/ChatHeader';
@@ -26,6 +27,7 @@ import { Calendar, RefreshCw, Headset, XCircle, UserPlus, UserCheck } from 'luci
 export function App() {
   const [isBackendOnline, setIsBackendOnline] = useState<boolean>(false);
   const [dentists, setDentists] = useState<Dentist[]>(mockDentists);
+  const [treatments, setTreatments] = useState<Treatment[]>(mockTreatments);
 
   const [stepHistory, setStepHistory] = useState<StepState[]>(['welcome']);
   const [messages, setMessages] = useState<Message[]>([
@@ -73,13 +75,19 @@ export function App() {
         setIsBackendOnline(online);
         if (online) {
           try {
-            const apiDentists = await apiClient.getDentists();
+            const [apiDentists, apiTreatments] = await Promise.all([
+              apiClient.getDentists(),
+              apiClient.getTreatments().catch(() => mockTreatments),
+            ]);
             setDentists(apiDentists);
+            setTreatments(apiTreatments);
           } catch {
             setDentists(mockDentists);
+            setTreatments(mockTreatments);
           }
         } else {
           setDentists(mockDentists);
+          setTreatments(mockTreatments);
         }
       }
     }
@@ -300,29 +308,35 @@ export function App() {
     if (!selectedDentist || !selectedSlot) return;
 
     setIsSubmitting(true);
-    let refCode = `DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
+    let refCode = `REQ-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
     let resolvedPatientId: string | undefined = patientDetails.patientId;
 
     if (isBackendOnline) {
       try {
-        // Step A: Register or get patient ID in FastAPI Excel DB
+        // Step A: Register or get patient ID in FastAPI Excel DB if new
         if (!resolvedPatientId) {
-          resolvedPatientId = await apiClient.registerPatient(patientDetails);
+          try {
+            resolvedPatientId = await apiClient.registerPatient(patientDetails);
+          } catch {
+            // Patient registration fallback
+          }
         }
 
-        // Step B: Book appointment in FastAPI Excel DB
-        const bk = await apiClient.bookAppointment({
-          patientId: resolvedPatientId,
+        // Step B: Submit Patient Request via POST /api/v1/patient-requests
+        const reqResult = await apiClient.submitPatientRequest({
+          patientName: patientDetails.fullName,
+          patientPhone: patientDetails.phone,
+          patientAge: patientDetails.ageOrDob,
           dentistId: selectedDentist.id,
-          date: selectedSlot.date,
-          startTime: selectedSlot.startTime,
-          endTime: selectedSlot.endTime,
+          preferredDate: selectedSlot.date,
+          preferredStartTime: selectedSlot.startTime,
+          preferredEndTime: selectedSlot.endTime,
           reason: patientDetails.reason,
         });
 
-        refCode = bk.appointmentId;
+        refCode = reqResult.requestId;
       } catch (err: any) {
-        console.warn('Backend booking fallback to demo mode:', err);
+        console.warn('Backend request submission fallback to demo mode:', err);
       }
     }
 
@@ -332,7 +346,7 @@ export function App() {
       date: selectedDateLabel,
       timeSlot: selectedSlot,
       referenceCode: refCode,
-      patientId: resolvedPatientId,   // PAT-XXXXXX stored here
+      patientId: resolvedPatientId,   // PAT-XXXXXX stored here if registered
       createdTimestamp: getCurrentTime(),
     };
 
@@ -340,7 +354,7 @@ export function App() {
     setIsSubmitting(false);
     addPatientMessage('Confirm Appointment Request', 'review');
     pushStep('confirmed');
-    addBotMessage(`Your appointment request has been recorded! Reference: ${refCode}`, 'confirmed');
+    addBotMessage(`Your appointment request has been recorded! Reference: ${refCode} (Pending Staff Confirmation)`, 'confirmed');
   };
 
   const handleCancelFlow = () => {
@@ -441,6 +455,7 @@ export function App() {
               <TextInputStep
                 currentStep={currentStep}
                 onSubmitValue={handleTextInputSubmit}
+                treatments={treatments}
               />
             )}
 
@@ -479,6 +494,10 @@ export function App() {
               <SlotPicker
                 selectedDentist={selectedDentist}
                 onSelectSlot={handleSlotSelect}
+                onSwitchDentist={() => {
+                  const anyDoc = dentists.find((d) => d.id === 'DOC-ANY') || dentists[0];
+                  handleDentistSelect(anyDoc);
+                }}
                 isBackendOnline={isBackendOnline}
               />
             )}
