@@ -224,6 +224,31 @@ Get a single patient profile.
 
 ---
 
+### `PATCH /api/patients/{patient_id}` (or `PUT /api/patients/{patient_id}`)
+Update demographics, contact details, address, or medical flags for an existing patient.
+
+**Request body (all fields optional):**
+```json
+{
+  "full_name": "Rahul Sharma",
+  "dob_or_age": "33",
+  "phone": "+91 9988776655",
+  "email": "rahul.updated@example.com",
+  "gender": "Male",
+  "address": "456 Marina Boulevard, Singapore",
+  "emergency_contact": "Anita Sharma +91 9876543210",
+  "allergies": "Penicillin, Sulfa drugs",
+  "medical_conditions": "Hypertension, Mild Asthma",
+  "consent_status": "acknowledged"
+}
+```
+
+**Response `200`:** Updated Patient object with refreshed `updated_at` timestamp.  
+**Response `404`:** Patient not found.
+
+---
+
+
 ### `GET /api/patients/{patient_id}/visits`
 Get all previous visit summaries for a patient, sorted newest first.
 
@@ -899,6 +924,19 @@ Staff rejects a request with an optional reason note.
 
 ---
 
+### `POST /api/v1/patient-requests/{request_id}/cancel`
+Patient or staff cancels a request (used by simulator cancellation card).
+If the request was already approved and linked to an appointment (`appointment_id`), the linked appointment is automatically cancelled as well.
+
+**Request body (optional):**
+```json
+{ "review_notes": "Patient requested cancellation due to scheduling conflict." }
+```
+
+**Response `200`:** Updated Patient Request object with `status: "cancelled"`.
+
+---
+
 ## Status Enum Reference
 
 ### Appointment Status (`status`)
@@ -924,7 +962,18 @@ Staff rejects a request with an optional reason note.
 | `pending` | Partial payment or awaiting insurance clearance |
 | `refunded` | Charge refunded |
 
+### Patient Request Status (`status`)
+
+| Value | Meaning |
+|---|---|
+| `pending` | Submitted by simulator or WhatsApp; awaiting clinic review |
+| `approved` | Accepted by staff; confirmed appointment created (`APT-XXXXXX`) |
+| `rejected` | Declined by staff with review notes |
+| `converted` | Converted directly into an active appointment |
+| `cancelled` | Cancelled by patient or staff via simulator |
+
 ---
+
 
 ## Common Frontend Workflows
 
@@ -1015,3 +1064,29 @@ PUT /api/dentists/DOC-000001/schedule/1
    → Books confirmed appointment under filelock
    → Request transitions to "approved" with appointment_id
 ```
+
+### Update Patient Profile Flow (Simulator or Reception)
+```
+1. Front desk or patient requests detail update:
+   PATCH /api/patients/PAT-000001
+   {
+     "phone": "+91 9999988888",
+     "address": "Flat 4B, Lotus Apartments",
+     "allergies": "Sulfa drugs"
+   }
+   → Returns updated Patient record with refreshed updated_at timestamp.
+```
+
+### Cancellation Flow (Dual Reference: REQ- & APT-)
+```
+1. Simulator checks reference format:
+   - If ID starts with "REQ-":
+     POST /api/v1/patient-requests/REQ-000001/cancel
+     { "review_notes": "Cancelled by patient" }
+     → Marks request as "cancelled" and auto-cancels linked appointment if approved.
+   - If ID starts with "APT-":
+     POST /api/appointments/APT-000001/cancel
+     { "reason": "Patient requested cancellation" }
+     → Marks appointment as "cancelled" and immediately frees the slot on availability.
+```
+

@@ -18,7 +18,7 @@
 3. **Mandatory file locking:** Every read and write operation must acquire an OS-level file lock (`clinic_data.xlsx.lock`).
 4. **Lock-once-delegate pattern:** Public repository methods acquire the workbook lock once and delegate to private `_unlocked` methods. Re-entrant lock acquisitions that cause deadlocks are forbidden.
 5. **Atomic writes:** Writes must be performed to a temporary file (`.tmp`), validated for schema integrity, and atomically moved into place using `os.replace()`.
-6. **Automated pre-write backups:** Before applying modifications, create a timestamped backup copy in the `backups/` directory.
+6. **Controlled single-workbook storage:** To prevent storage bloat where 100 entries generate 100 backup files, automatic backups on every write are disabled (`AUTO_BACKUP_ON_SAVE = False`). All data is persisted directly into the authoritative `clinic_data.xlsx` workbook under filelock with `created_at` and `booking_time` timestamps. Backups are performed via explicit administrative actions or maintenance scripts (`scripts/cleanup_backups.py`).
 7. **Stable identifiers:** All records must use deterministic, sequenced IDs (`PAT-000001`, `APT-000001`, `DOC-000001`, `VIS-000001`). Patient names or row numbers must never be used as primary keys.
 8. **Persistent storage requirement:** In hosted or containerized environments, the workbook directory must be mounted to persistent storage, never ephemeral filesystems.
 9. **No secrets in Excel:** API keys, passwords, and sensitive system secrets must never be stored in the workbook.

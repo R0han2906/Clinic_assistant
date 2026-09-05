@@ -40,10 +40,10 @@ This document serves as the long-term memory for the DentalFlow project, recordi
 |---|---|---|---|
 | **Phase 1** | Confirm Real Dental-Clinic Workflow | In Progress | Working with partner clinic patterns (1 dentist default, up to 3). |
 | **Phase 2** | Staff Website Prototype | Next Priority | UI layout designed in [Product Design Specification.md](file:///c:/Users/Dhruv%20Dube/Desktop/hackathons/Projects/Clinic_assistant/docs/Product%20Design%20Specification.md). |
-| **Phase 3** | FastAPI & Excel Pilot Backend | **COMPLETED** | MVC architecture, 9 sheets, atomic writes, filelock, all 10 tests green. |
-| **Phase 4** | Patient Registration & Visit Workflow | Backend Ready | APIs `/api/patients` and `/api/visits` fully functional. |
-| **Phase 5** | Dentist Availability & Booking | Backend Ready | Slot calculation with working hours, breaks, and leaves complete. |
-| **Phase 6** | Build Patient Request Simulator | Planned | Test harness to imitate WhatsApp requests against FastAPI services. |
+| **Phase 3** | FastAPI & Excel Pilot Backend | **COMPLETED** | Layered architecture, 12 sheets, atomic writes, filelock, single workbook, all 25 tests green. |
+| **Phase 4** | Patient Registration & Visit Workflow | Backend Ready | APIs `/api/patients` (with PATCH) and `/api/visits` fully functional. |
+| **Phase 5** | Dentist Availability & Booking | Backend Ready | Slot calculation with working hours, breaks, leaves, and cancellations complete. |
+| **Phase 6** | Build Patient Request Simulator | **COMPLETED** | Built `patient-whatsapp-simulator/` in React + TS + Vite with booking, update, & cancellation. |
 | **Phase 7** | Controlled Clinic Pilot | Planned | 2–4 week pilot with partner clinic. |
 | **Phase 8** | Decide on Supabase Migration | Deferred | Triggered when concurrency or multiple clinics demand it. |
 | **Phase 9** | Real WhatsApp Integration | Deferred | Triggered once website workflow is stable and number is active. |
@@ -54,7 +54,7 @@ This document serves as the long-term memory for the DentalFlow project, recordi
 
 1. **Excel Concurrency & Corruption:**
    - *Risk:* Multiple simultaneous requests or crashed writes corrupting `clinic_data.xlsx`.
-   - *Safeguards:* OS-level `filelock.FileLock`, atomic temp-file rename (`os.replace`), and rolling pre-write snapshots in `backups/`.
+   - *Safeguards:* OS-level `filelock.FileLock`, atomic temp-file rename (`os.replace`), single authoritative workbook (`AUTO_BACKUP_ON_SAVE = False`), and on-demand snapshots.
 2. **Re-entrant FileLock Deadlocks:**
    - *Risk:* Nested method calls attempting to acquire the same non-reentrant lock.
    - *Safeguard:* Lock-once-delegate architecture where public methods acquire the lock once and pass in-memory state to private `_unlocked` helpers.
@@ -91,3 +91,5 @@ This document serves as the long-term memory for the DentalFlow project, recordi
 | Revision 3 | Simulator-First Integration | Added Patient Request Simulator to compensate for absence of dedicated WhatsApp number; aligned roadmap to 9 distinct phases. |
 | Revision 4 | UI Photos Backend Alignment | Expanded backend for clinical checkup wizard (vitals, 32-tooth odontogram, canker sores, informed consent), procedure catalog (`Treatments`), and appointment billing/payment tracking; expanded workbook to 11 sheets. |
 | Revision 5 | Proper Layered Architecture | Reorganized backend into strict dedicated layers (app/api/v1/routes, app/controllers, app/services, app/models, app/repositories, app/shared, app/infrastructure, scripts); added Patient Request Simulator module with REQ-XXXXXX IDs and 12th workbook sheet; added Request-ID tracing middleware. |
+| Revision 6 | Single Workbook & Simulator Polish | Enforced single-workbook storage (AUTO_BACKUP_ON_SAVE = False) avoiding file sprawl; stamped booking_time on all records; added PATCH /api/patients/{id}; added cancellation flows for APT- and REQ-; completed React WhatsApp Simulator with live status badges; 25/25 tests passing. |
+

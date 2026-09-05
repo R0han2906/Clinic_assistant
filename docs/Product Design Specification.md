@@ -102,29 +102,34 @@ All core actions should be accessible within two clicks from the main navigation
 
 ## 4. Patient Request Simulator UX (Phase 6)
 
-The Patient Request Simulator is a dedicated, separate interface designed for developers, testers, and clinic managers to validate patient-side request handling.
+The Patient Request Simulator is built as an authentic React + TypeScript + Vite web application (`patient-whatsapp-simulator/`) simulating the WhatsApp patient conversation and self-service appointment portal.
 
-### 4.1 Layout & Visual Differentiation
-- Distinct visual theme (e.g., mobile preview frame or conversational card layout) clearly separating it from the clinic staff dashboard.
-- Simulates the information a patient would submit over WhatsApp.
+### 4.1 Layout & Visual Theme
+- Authentic WhatsApp mobile conversation frame (green brand accents `#075E54` / `#25D366`, chat bubbles, and timestamping).
+- Interactive card components embedded directly within the chat stream to guide user actions.
 
-### 4.2 Simulator Input Fields
-1. **Patient Identifier / Contact:**
-   - Name ("Jane Doe")
-   - Phone Number ("+1-555-0199")
-2. **Appointment Preferences:**
-   - Preferred Dentist (Select specific dentist or "Any Available Dentist")
-   - Target Date (Date picker)
-   - Preferred Time Window (Morning, Afternoon, or specific range)
-   - Appointment Reason / Notes (e.g., "Regular checkup & cleaning")
-3. **Submit Button:** "Send Simulated Patient Request"
+### 4.2 Interactive Simulator Cards
+1. **Phone Verification Card (`PhoneVerificationCard`):**
+   - Inputs patient phone number and queries `GET /api/patients?query={phone}`.
+   - Automatically detects returning patients versus first-time patients.
+2. **New Patient Onboarding Card (`NewPatientCard`):**
+   - Collects Full Name, Age/DOB, and contact details, persisting them via `POST /api/patients`.
+3. **Dentist & Slot Selection Card (`SlotSelectionCard`):**
+   - Dynamic dentist selector (`GET /api/dentists`), procedure picker (`GET /api/treatments`), and live available 30-minute time slots (`GET /api/availability/slots`).
+   - Dispatches booking request to `POST /api/v1/patient-requests`.
+4. **Existing Appointment Card (`ManageExistingAptCard`):**
+   - Displays dentist, treatment, date, and time slot.
+   - Status indicators: `CONFIRMED` (green), `PENDING` (yellow), `CANCELLED` (red).
+   - Actions: **"Edit Details"** and **"Cancel Appointment"**.
+5. **Patient Profile Update Card (`UpdatePatientCard`):**
+   - Form allowing updates to name, phone number, age/DOB, and address.
+   - Synchronizes directly with the backend via `PATCH /api/patients/{patient_id}`.
+6. **Cancellation Card (`CancelAppointmentCard`):**
+   - Prompts the patient for a cancellation reason (preset choices or custom text).
+   - Shows warning that the reserved slot will be immediately made available to others.
+   - Dual reference routing: calls `POST /api/v1/patient-requests/{id}/cancel` for `REQ-` requests or `POST /api/appointments/{id}/cancel` for `APT-` appointments.
+   - Updates status badge to `CANCELLED` and displays a "Book a New Appointment" option.
 
-### 4.3 Simulator Output & Verification
-- On submit, makes an HTTP POST request to the FastAPI backend.
-- Displays immediate response:
-  - **Success:** Displays confirmed booking with `APT-XXXXXX` ID, dentist name, and confirmed time slot.
-  - **Conflict / Alternatives:** Displays alternative available slot options returned by the availability service.
-- Verification banner: Informs tester that the booking has been dispatched to the clinic schedule and prompts them to verify appearance on the Staff Website.
 
 ---
 

@@ -53,10 +53,10 @@ Do not invert or bypass phases without explicit user instruction.
 
 ## 5. Storage & Repository Guidelines
 
-- **Workbook File:** `backend/clinic_data.xlsx` containing 9 sheets: `Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`.
+- **Workbook File:** `backend/data/clinic_data.xlsx` containing 12 sheets: `Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`, `Treatments`, `MedicalCheckups`, `PatientRequests`.
 - **Lock-Once-Delegate Pattern:** Public repository methods must acquire `filelock.FileLock` once, load data, perform operations, write atomically, and delegate complex queries to private `_unlocked` helper functions. This prevents re-entrant filelock deadlocks.
-- **Atomic Writes:** All updates must be serialized to a temporary `.tmp` file, validated, backed up to `backups/`, and replaced using `os.replace()`.
-- **Sequenced IDs:** Generate IDs using `_next_sequence(rows, prefix)` to guarantee strictly ascending, collision-free identifiers.
+- **Single-Workbook Storage & Atomic Writes:** All updates are serialized to a temporary `.tmp` file, validated, and atomically replaced via `os.replace()`. Automatic backups on every write are disabled (`AUTO_BACKUP_ON_SAVE = False`) to prevent disk bloat (no 100 files for 100 entries). All rows record `created_at` and `booking_time` timestamps.
+- **Sequenced IDs:** Generate IDs using `_next_sequence(rows, prefix)` to guarantee strictly ascending, collision-free identifiers (`PAT-XXXXXX`, `APT-XXXXXX`, `REQ-XXXXXX`, `DOC-XXXXXX`, etc.).
 
 ---
 

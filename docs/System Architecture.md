@@ -89,15 +89,15 @@ One workbook per clinic (`clinic_data.xlsx`), organized into 12 normalized sheet
 
 | Sheet | Purpose | Primary Identifier Format | Key Fields |
 |---|---|---|---|
-| `Patients` | Patient records | `PAT-000001` | `patient_id`, `name`, `age`, `dob`, `phone`, `email`, `gender`, `address`, `allergies`, `medical_conditions`, `created_at` |
-| `Visits` | Structured past visit summaries | `VIS-000001` | `visit_id`, `patient_id`, `dentist_id`, `visit_date`, `visit_type`, `summary` |
-| `Dentists` | Dentist profiles | `DOC-000001` | `dentist_id`, `name`, `specialty`, `is_active` |
-| `Availability` | Weekly schedule rules | Row index | `dentist_id`, `day_of_week`, `start_time`, `end_time`, `break_start`, `break_end`, `slot_duration` |
-| `Leaves` | Blocked dates / leaves | Row index | `dentist_id`, `date`, `reason` |
-| `Appointments` | Scheduled appointments | `APT-000001` | `appointment_id`, `patient_id`, `dentist_id`, `date`, `start_time`, `end_time`, `status`, `treatment_name`, `source`, `payment_status`, `bill_number`, `clinical_notes` |
+| `Patients` | Patient records | `PAT-000001` | `patient_id`, `full_name`, `dob_or_age`, `phone`, `email`, `emergency_contact`, `gender`, `address`, `allergies`, `medical_conditions`, `consent_status`, `created_at`, `updated_at` |
+| `Visits` | Structured past visit summaries | `VIS-000001` | `visit_id`, `patient_id`, `dentist_id`, `visit_date`, `visit_type`, `summary`, `follow_up_recommendation`, `created_at` |
+| `Dentists` | Dentist profiles | `DOC-000001` | `dentist_id`, `name`, `specialty`, `phone`, `email`, `color_code`, `is_active`, `created_at` |
+| `Availability` | Weekly schedule rules | Row index | `availability_id`, `dentist_id`, `day_of_week`, `start_time`, `end_time`, `break_start`, `break_end`, `is_working_day` |
+| `Leaves` | Blocked dates / leaves | Row index | `leave_id`, `dentist_id`, `start_date`, `end_date`, `reason`, `created_at` |
+| `Appointments` | Scheduled appointments | `APT-000001` | `appointment_id`, `patient_id`, `dentist_id`, `date`, `start_time`, `end_time`, `booking_time`, `treatment_name`, `source`, `payment_status`, `bill_number`, `clinical_notes`, `status`, `reason`, `notes`, `created_at`, `updated_at` |
 | `Treatments` | Clinical procedure catalog | `TRT-000001` | `treatment_id`, `name`, `category`, `default_duration_minutes`, `estimated_cost`, `description` |
-| `MedicalCheckups` | 4-step odontogram & examination | `CHK-000001` | `checkup_id`, `appointment_id`, `patient_id`, `dentist_id`, `vitals`, `teeth_findings_json`, `oral_conditions_json`, `plan_agreement_notes` |
-| `PatientRequests` | Simulator & WhatsApp intake | `REQ-000001` | `request_id`, `patient_name`, `patient_phone`, `patient_age`, `dentist_id`, `preferred_date`, `preferred_start_time`, `preferred_end_time`, `status`, `review_notes`, `appointment_id` |
+| `MedicalCheckups` | 4-step odontogram & examination | `CHK-000001` | `checkup_id`, `appointment_id`, `patient_id`, `dentist_id`, `blood_pressure`, `teeth_findings_json`, `canker_sores`, `anomalous_teeth`, `consent_status`, `status` |
+| `PatientRequests` | Simulator & WhatsApp intake | `REQ-000001` | `request_id`, `patient_name`, `patient_phone`, `patient_age`, `dentist_id`, `preferred_date`, `preferred_start_time`, `preferred_end_time`, `status`, `review_notes`, `appointment_id`, `booking_time`, `created_at`, `updated_at` |
 | `Staff` | Internal staff accounts | `STF-000001` | `staff_id`, `username`, `role`, `is_active` |
 | `AuditLog` | Auditable state changes | `AUD-000001` | `audit_id`, `entity_type`, `entity_id`, `action`, `performed_by`, `timestamp` |
 | `Metadata` | Schema version & clinic info | Single row | `schema_version`, `clinic_name`, `timezone`, `last_updated` |
@@ -114,12 +114,10 @@ One workbook per clinic (`clinic_data.xlsx`), organized into 12 normalized sheet
 7. Updated schedule renders immediately on the website.
 
 ### 5.2 Patient Request Simulator Flow
-1. Tester inputs patient details, requested dentist, preferred date, and slot on the Simulator UI.
-2. Simulator posts JSON payload to `/api/patient-request`.
-3. FastAPI invokes the shared `PatientService` and `AppointmentService`.
-4. The appointment is atomically saved to `Appointments` and `AuditLog` in `clinic_data.xlsx`.
-5. Simulator displays confirmation with appointment details and `APT-XXXXXX` ID.
-6. The booked slot instantly appears as occupied on the Staff Website daily schedule.
+1. **Intake / New Booking:** Simulator posts structured request to `POST /api/v1/patient-requests`.
+2. **Review & Conversion:** Clinic staff reviews pending requests (`GET /api/v1/patient-requests?status=pending`) and approves (`POST /api/v1/patient-requests/{id}/approve`), auto-converting it to a confirmed appointment (`APT-XXXXXX`) and creating/linking the patient record.
+3. **Profile Detail Updates:** Patient updates contact info or address directly from the simulator card via `PATCH /api/patients/{patient_id}`.
+4. **Cancellation Flow:** Simulator issues `POST /api/v1/patient-requests/{id}/cancel` (for `REQ-` requests) or `POST /api/appointments/{id}/cancel` (for `APT-` bookings), immediately freeing the calendar slot and updating status to `cancelled`.
 
 ### 5.3 Future WhatsApp Webhook Flow
 1. Patient sends a message on WhatsApp.
@@ -134,9 +132,10 @@ Excel is suitable only as a controlled pilot store. The following engineering sa
 1. **Single Writer:** FastAPI is the sole process with write access to `clinic_data.xlsx`. Direct edits by staff are strictly prohibited while the server runs.
 2. **OS-Level File Locking:** `filelock.FileLock` ensures that parallel requests wait their turn and do not overwrite each other.
 3. **Atomic Replacement:** Changes are written to a temporary file (`clinic_data.xlsx.tmp`) and atomically renamed via `os.replace()`, preventing corrupt partial writes.
-4. **Pre-Write Backups:** Before saving modifications, a timestamped snapshot is saved to `backups/`.
+4. **Single-Workbook Invariant & Controlled Snapshots:** To avoid file sprawl (where 100 requests create 100 backup files), automatic per-write backups are disabled (`AUTO_BACKUP_ON_SAVE = False`). All transactions persist to a single authoritative `clinic_data.xlsx` with `booking_time` and `created_at` timestamps. Automated cleanup utilities (`scripts/cleanup_backups.py`) and on-demand snapshots maintain a clean storage footprint.
 5. **Lock-Once Architecture:** Complex workflows (such as booking, which checks availability and saves an appointment) execute within a single lock acquisition to prevent deadlocks.
 6. **Persistent Storage Requirement:** In hosted environments, the workbook directory must reside on a persistent volume, never on ephemeral container filesystems.
+
 
 ## 7. Migration Readiness (Excel to Supabase)
 

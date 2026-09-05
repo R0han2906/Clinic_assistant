@@ -41,15 +41,15 @@ Core baseline:
 ## Phase 3: FastAPI and Excel Pilot Backend
 
 - **Objective:** Deliver a robust, typed backend API backed by controlled, single-writer Excel pilot storage.
-- **Status:** **COMPLETED & VERIFIED** (FastAPI MVC architecture, 9-sheet openpyxl repository, atomic writes, OS file locking, pre-write backups, full test suite passing).
+- **Status:** **COMPLETED & VERIFIED** (FastAPI layered architecture, 12-sheet openpyxl repository, atomic writes, OS file locking, single-workbook storage invariant without backup file sprawl, full 25-test suite passing).
 - **Activities:**
-  - Build FastAPI REST controllers for patients, visits, dentists, schedules, leaves, and appointments.
-  - Implement 9-sheet workbook schema (`Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`).
+  - Build FastAPI REST routes and controllers for patients, visits, dentists, schedules, leaves, appointments, treatments, checkups, and patient requests.
+  - Implement 12-sheet workbook schema (`Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`, `Treatments`, `MedicalCheckups`, `PatientRequests`).
   - Implement atomic write mechanism (write to `.tmp` -> validate -> `os.replace()`).
   - Implement file locking (`filelock.FileLock`) using the **lock-once-delegate pattern** to prevent re-entrant deadlocks.
-  - Implement automatic rolling backups before every modifying write.
-  - Implement collision-free sequenced ID generators (`PAT-XXXXXX`, `APT-XXXXXX`, etc.).
-- **Exit Gate:** All automated tests pass (10/10 green), zero deadlocks, and verified atomic persistence.
+  - Implement single-workbook storage invariant (`AUTO_BACKUP_ON_SAVE = False`) with explicit `booking_time` and `created_at` timestamp tracking.
+  - Implement collision-free sequenced ID generators (`PAT-XXXXXX`, `APT-XXXXXX`, `REQ-XXXXXX`, etc.).
+- **Exit Gate:** All automated tests pass (25/25 green), zero deadlocks, and verified atomic persistence.
 - **Stop or Pivot Condition:** If file corruption occurs under load, immediately halt feature development until storage safety invariants are restored.
 
 ---
@@ -60,9 +60,10 @@ Core baseline:
 - **Activities:**
   - Integrate frontend registration form with `POST /api/patients`.
   - Handle duplicate detection warnings (HTTP 409) with explicit staff bypass confirmation (`force_create=true`).
-  - Connect patient search by name, phone, or ID to `GET /api/patients/search`.
-  - Connect patient profile and structured visit entry to `POST /api/visits` and `GET /api/visits/patient/{patient_id}`.
-- **Exit Gate:** Front-desk staff can register new patients, view instant duplicate warnings, and append structured visit summaries that persist reliably to `clinic_data.xlsx`.
+  - Connect patient search by name, phone, or ID to `GET /api/patients?query=...`.
+  - Connect patient profile and structured visit entry to `POST /api/patients/{id}/visits` and `GET /api/patients/{id}/visits`.
+  - Support profile editing via `PATCH /api/patients/{id}`.
+- **Exit Gate:** Front-desk staff can register new patients, view instant duplicate warnings, edit patient details, and append structured visit summaries that persist reliably to `clinic_data.xlsx`.
 - **Stop or Pivot Condition:** Revise search indexing or duplicate matching logic if staff experience false-positive duplicate blocking.
 
 ---
@@ -75,7 +76,7 @@ Core baseline:
   - Connect slot selection to `GET /api/availability/slots?dentist_id={id}&date={date}`.
   - Verify that working hours, breaks, leaves, and booked appointments are deducted correctly.
   - Connect booking submission to `POST /api/appointments`.
-  - Implement appointment rescheduling and cancellation workflows.
+  - Implement appointment rescheduling (`POST /api/appointments/{id}/reschedule`) and cancellation (`POST /api/appointments/{id}/cancel`) workflows.
 - **Exit Gate:** Zero double bookings under concurrent booking attempts; schedule updates instantly on the daily calendar.
 - **Stop or Pivot Condition:** If slot generation logic creates conflicting ranges, halt and fix core service algorithms before continuing.
 
@@ -84,14 +85,17 @@ Core baseline:
 ## Phase 6: Build Patient Request Simulator
 
 - **Objective:** Build an external patient request simulator to imitate the future WhatsApp patient experience in the absence of a live WhatsApp business number.
+- **Status:** **COMPLETED & OPERATIONAL** (Built `patient-whatsapp-simulator/` in React + TypeScript + Vite).
 - **Activities:**
-  - Build a standalone simulator web interface (chat-like or simple structured form).
-  - Allow tester/patient to enter name, phone, preferred dentist, preferred date, slot range, and visit reason.
-  - Connect simulator to FastAPI patient-request endpoints (`/api/patient-request` or shared appointment services).
-  - Display available slots and booking confirmations back to the simulator.
-  - Verify that appointments booked via the simulator immediately appear on the staff website schedule.
-- **Exit Gate:** Simulator successfully creates valid, non-conflicting appointments through the exact same backend services that WhatsApp will later call.
+  - Build a standalone simulator web interface featuring authentic WhatsApp message bubbles and interactive cards.
+  - Implemented phone verification and returning patient recognition vs new patient onboarding.
+  - Implemented real-time slot selection with dentist and treatment pickers calling `/api/availability/slots` and `/api/treatments`.
+  - Connected intake submission to `POST /api/v1/patient-requests` generating `REQ-XXXXXX` IDs.
+  - Implemented **Patient Profile Updates (`UpdatePatientCard.tsx`)** connected to `PATCH /api/patients/{id}`.
+  - Implemented **Interactive Cancellation Card (`CancelAppointmentCard.tsx`)** with reason selection and dual reference routing (`REQ-` vs `APT-`).
+- **Exit Gate:** Simulator successfully submits requests, updates patient details, and handles cancellations through the exact same backend services that WhatsApp will later call.
 - **Stop or Pivot Condition:** If simulator requires custom business rules different from staff booking, halt immediately and reconcile domain services to maintain a single booking engine.
+
 
 ---
 

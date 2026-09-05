@@ -97,20 +97,25 @@ The first release must allow staff and testers to:
 - Book, reschedule, and cancel appointment ranges with zero double bookings.
 - Review the daily dentist schedule.
 - Search for existing patients by name, phone, or stable identifier.
-- Store and retrieve all records from a structured 9-sheet Excel workbook with file locking and atomic writes.
-- Submit simulated patient appointment requests via the **Patient Request Simulator** and verify that requests appear correctly on the staff website.
+- Update patient demographics, contact details, address, and medical flags via `PATCH /api/patients/{id}`.
+- Store and retrieve all records from a structured 12-sheet Excel workbook (`clinic_data.xlsx`) with file locking, atomic writes, and single-workbook storage invariants (preventing backup file sprawl).
+- Submit simulated patient appointment requests and cancel them via the **Patient Request Simulator**, verifying that state reflects in real time.
 - Export or download the Excel workbook for backup or manual audit.
 
 ## 8. Initial Data Scope
 
 ### Patient registration
-The patient record contains only fields required for registration and scheduling operations:
+The patient record contains essential fields for registration and scheduling operations:
 - Patient identifier (`PAT-000001` format).
 - Full name.
 - Age or date of birth.
 - Phone number.
 - Optional email address.
-- Emergency contact information (only if explicitly required by clinic).
+- Gender (e.g. "Male", "Female", "Other").
+- Residential street address.
+- Emergency contact name and phone.
+- Known drug/medical allergies (e.g. Penicillin).
+- Known pre-existing medical conditions (e.g. Hypertension).
 - Consent / acknowledgement status.
 - Created timestamp and last updated timestamp.
 
