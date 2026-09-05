@@ -76,7 +76,8 @@ Recommended sheets:
 | `Patients` | One row per registered patient |
 | `Visits` | One row per previous or new visit summary |
 | `Dentists` | Dentist identity and status |
-| `Availability` | Working days, hours, breaks, and blocked periods |
+| `Availability` | Working days, hours, and break times per dentist per day of week |
+| `Leaves` | Dentist leave and blocked date ranges — excluded from slot calculation |
 | `Appointments` | One row per appointment |
 | `Staff` | Staff accounts or imported staff reference |
 | `AuditLog` | Important changes and source of change |

@@ -95,12 +95,12 @@
 ## 9. Agent Documentation Rules
 
 1. Read all project Markdown files before a material change.
-2. Update `PRD.md` when product scope or requirements change.
-3. Update `Architecture.md` when components, storage, data flow, or deployment change.
-4. Update `Design.md` when workflows, screens, language, or accessibility change.
-5. Update `phases.md` when implementation order or release gates change.
-6. Update `memory.md` when a decision, risk, current stage, or unresolved question changes.
-7. Update `agent.md` only when the project operating process changes.
+2. Update `docs/Product Requirements Document.md` when product scope or requirements change.
+3. Update `docs/System Architecture.md` when components, storage, data flow, or deployment change.
+4. Update `docs/Product Design Specification.md` when workflows, screens, language, or accessibility change.
+5. Update `docs/Implementation Phases.md` when implementation order or release gates change.
+6. Update `docs/Project Memory.md` when a decision, risk, current stage, or unresolved question changes.
+7. Update `docs/Agent.md` only when the project operating process changes.
 8. Keep all documents consistent; do not leave the old WhatsApp-first assumptions in one file after the scope changes.
 
 ## 10. Definition of Done

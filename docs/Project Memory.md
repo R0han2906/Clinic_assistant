@@ -55,7 +55,21 @@ Passwords and API secrets must never be stored in the workbook. Real patient dat
 
 ## Current Stage
 
-The project is in the revised planning stage. The next implementation step is to define the first dental-clinic workflow and build the staff website prototype before adding WhatsApp.
+Phase 2 (FastAPI and Excel Pilot Backend) is implemented and locally verified.
+
+**Completed:**
+- FastAPI MVC backend with all routes for patients, visits, dentists, appointments, and system health.
+- Structured 9-sheet workbook (`Patients`, `Visits`, `Dentists`, `Availability`, `Leaves`, `Appointments`, `Staff`, `AuditLog`, `Metadata`).
+- Atomic file writes with OS-level file locking (`filelock`) and pre-write backups.
+- Lock-once-delegate repository pattern — all methods acquire the workbook lock once and use private `_unlocked` helpers internally, eliminating re-entrant deadlock.
+- Collision-free ID generation via `_next_sequence` helper.
+- Dentist schedule management (PUT per day of week) and leave management (POST leave ranges).
+- Availability slot calculation that subtracts working hours, breaks, leaves, and existing appointments in one workbook read.
+- Duplicate patient detection with `force_create` bypass workflow.
+- Full automated test suite passing (10 tests).
+- Frontend API Reference document at `docs/API Reference.md`.
+
+**Next step:** Build the staff website frontend (Phase 1 exit gate) and connect it to the running backend.
 
 ## Main Risks
 
@@ -89,3 +103,6 @@ Claims about WhatsApp capabilities, pricing, policies, data protection, or provi
 |---|---|
 | Initial planning | Product originally considered WhatsApp-first clinic automation |
 | Revised scope | Product changed to dentist-clinic website first, Excel pilot storage, WhatsApp later, Supabase deferred |
+| Phase 2 implementation | FastAPI MVC backend built, all routes implemented, test suite passing, 9-sheet workbook schema |
+| Lock architecture fix | Re-entrant FileLock deadlocks eliminated via lock-once-delegate pattern with `_unlocked` private helpers |
+| Dentist schedule & leave | Added PUT schedule-per-day and POST leave endpoints; slot calculation now subtracts leaves automatically |

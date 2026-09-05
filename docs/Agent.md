@@ -24,12 +24,12 @@ Do not reverse this order without an explicit user decision and a documented rea
 
 Before a material decision, read:
 
-- `PRD.md` for product scope and requirements.
-- `Architecture.md` for system boundaries and technical decisions.
-- `rules.md` for non-negotiable behavior and safety rules.
-- `phases.md` for the current implementation stage and exit gates.
-- `Design.md` for staff workflows and interaction requirements.
-- `memory.md` for durable project context, decisions, risks, and open questions.
+- `docs/Product Requirements Document.md` for product scope and requirements.
+- `docs/System Architecture.md` for system boundaries and technical decisions.
+- `docs/Project Rules.md` for non-negotiable behavior and safety rules.
+- `docs/Implementation Phases.md` for the current implementation stage and exit gates.
+- `docs/Product Design Specification.md` for staff workflows and interaction requirements.
+- `docs/Project Memory.md` for durable project context, decisions, risks, and open questions.
 
 If the repository contains more specific code or framework instructions, inspect them before editing. Do not assume that documentation and implementation are already consistent.
 
@@ -137,13 +137,13 @@ Update the files according to this mapping:
 
 | Change | File to update |
 |---|---|
-| Product scope, users, requirements, fields, metrics | `PRD.md` |
-| Components, data flow, storage, migration, deployment | `Architecture.md` |
-| Non-negotiable rules and constraints | `rules.md` |
-| Implementation order and release gates | `phases.md` |
-| Forms, screens, workflows, interaction, accessibility | `Design.md` |
-| Durable decisions, current state, risks, open questions | `memory.md` |
-| Agent behavior and project process | `agent.md` |
+| Product scope, users, requirements, fields, metrics | `docs/Product Requirements Document.md` |
+| Components, data flow, storage, migration, deployment | `docs/System Architecture.md` |
+| Non-negotiable rules and constraints | `docs/Project Rules.md` |
+| Implementation order and release gates | `docs/Implementation Phases.md` |
+| Forms, screens, workflows, interaction, accessibility | `docs/Product Design Specification.md` |
+| Durable decisions, current state, risks, open questions | `docs/Project Memory.md` |
+| Agent behavior and project process | `docs/Agent.md` |
 
 When one decision affects several areas, update every affected file in the same change. Remove obsolete WhatsApp-first or Supabase-first assumptions rather than leaving contradictory statements.
 
