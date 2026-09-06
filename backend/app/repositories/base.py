@@ -6,13 +6,17 @@ from app.models.dentist import DentistResponse, DentistCreate
 from app.models.availability import WorkingScheduleItem, LeaveItem, LeaveCreate, ScheduleUpdate
 from app.models.appointment import AppointmentResponse, AppointmentCreate, AppointmentStatus
 from app.models.audit import AuditLogEntry
+from app.models.treatment import Treatment, TreatmentCreate, TreatmentUpdate
+from app.models.staff import StaffMember, StaffCreate, StaffUpdate
+from app.models.sales import SaleResponse, SaleCreate, SaleSummary, PaymentMethodResponse
+from app.models.purchase import PurchaseResponse, PurchaseCreate, VendorResponse, VendorCreate
+from app.models.inventory import InventoryResponse, InventoryCreate, InventoryUpdate
+from app.models.peripheral import PeripheralResponse, PeripheralCreate, PeripheralUpdate
 
 class BaseClinicRepository(ABC):
     """
     Abstract repository interface for clinic data storage.
     All business logic accesses data solely through this interface.
-    This guarantees that migrating from Excel to Supabase in Phase 5
-    will require changing ONLY the concrete repository implementation.
     """
 
     # Initialization & Health
@@ -45,6 +49,10 @@ class BaseClinicRepository(ABC):
     def update_patient(self, patient_id: str, updates: Dict[str, Any]) -> Optional[PatientResponse]:
         pass
 
+    @abstractmethod
+    def delete_patient(self, patient_id: str) -> bool:
+        pass
+
     # Visits
     @abstractmethod
     def list_visits_for_patient(self, patient_id: str) -> List[VisitResponse]:
@@ -52,6 +60,10 @@ class BaseClinicRepository(ABC):
 
     @abstractmethod
     def create_visit(self, visit_data: VisitCreate) -> VisitResponse:
+        pass
+
+    @abstractmethod
+    def get_visit_by_appointment(self, appointment_id: str) -> Optional[VisitResponse]:
         pass
 
     # Dentists
@@ -109,6 +121,14 @@ class BaseClinicRepository(ABC):
         pass
 
     @abstractmethod
+    def update_appointment(
+        self,
+        appointment_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[AppointmentResponse]:
+        pass
+
+    @abstractmethod
     def update_appointment_status(
         self,
         appointment_id: str,
@@ -131,7 +151,23 @@ class BaseClinicRepository(ABC):
 
     # Treatments Catalog
     @abstractmethod
-    def list_treatments(self) -> List[Any]:
+    def list_treatments(self) -> List[Treatment]:
+        pass
+
+    @abstractmethod
+    def get_treatment(self, treatment_id: str) -> Optional[Treatment]:
+        pass
+
+    @abstractmethod
+    def create_treatment(self, treatment_data: TreatmentCreate) -> Treatment:
+        pass
+
+    @abstractmethod
+    def update_treatment(self, treatment_id: str, updates: TreatmentUpdate) -> Optional[Treatment]:
+        pass
+
+    @abstractmethod
+    def delete_treatment(self, treatment_id: str) -> bool:
         pass
 
     # Payment & Reminders
@@ -181,9 +217,141 @@ class BaseClinicRepository(ABC):
     ) -> Optional[Any]:
         pass
 
+    # Staff Members
+    @abstractmethod
+    def list_staff(self, active_only: bool = False) -> List[StaffMember]:
+        pass
+
+    @abstractmethod
+    def get_staff(self, staff_id: str) -> Optional[StaffMember]:
+        pass
+
+    @abstractmethod
+    def create_staff(self, staff_data: StaffCreate) -> StaffMember:
+        pass
+
+    @abstractmethod
+    def update_staff(self, staff_id: str, updates: StaffUpdate) -> Optional[StaffMember]:
+        pass
+
+    @abstractmethod
+    def delete_staff(self, staff_id: str) -> bool:
+        pass
+
+    # Sales
+    @abstractmethod
+    def list_sales(
+        self,
+        date: Optional[str] = None,
+        patient_id: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> List[SaleResponse]:
+        pass
+
+    @abstractmethod
+    def get_sale(self, sale_id: str) -> Optional[SaleResponse]:
+        pass
+
+    @abstractmethod
+    def create_sale(self, sale_data: SaleCreate) -> SaleResponse:
+        pass
+
+    @abstractmethod
+    def update_sale_status(self, sale_id: str, status: str) -> Optional[SaleResponse]:
+        pass
+
+    @abstractmethod
+    def get_sales_summary(self) -> SaleSummary:
+        pass
+
+    # Purchases
+    @abstractmethod
+    def list_purchases(self, status: Optional[str] = None) -> List[PurchaseResponse]:
+        pass
+
+    @abstractmethod
+    def get_purchase(self, purchase_id: str) -> Optional[PurchaseResponse]:
+        pass
+
+    @abstractmethod
+    def create_purchase(self, purchase_data: PurchaseCreate) -> PurchaseResponse:
+        pass
+
+    @abstractmethod
+    def update_purchase_status(
+        self, purchase_id: str, status: str, received_date: Optional[str] = None
+    ) -> Optional[PurchaseResponse]:
+        pass
+
+    # Inventory
+    @abstractmethod
+    def list_inventory(
+        self, category: Optional[str] = None, low_stock_only: bool = False
+    ) -> List[InventoryResponse]:
+        pass
+
+    @abstractmethod
+    def get_inventory_item(self, item_id: str) -> Optional[InventoryResponse]:
+        pass
+
+    @abstractmethod
+    def create_inventory_item(self, item_data: InventoryCreate) -> InventoryResponse:
+        pass
+
+    @abstractmethod
+    def update_inventory_item(
+        self, item_id: str, updates: InventoryUpdate
+    ) -> Optional[InventoryResponse]:
+        pass
+
+    @abstractmethod
+    def delete_inventory_item(self, item_id: str) -> bool:
+        pass
+
+    # Payment Methods
+    @abstractmethod
+    def list_payment_methods(self) -> List[PaymentMethodResponse]:
+        pass
+
+    @abstractmethod
+    def update_payment_method(
+        self, method_id: str, enabled: Optional[bool] = None, processing_fee: Optional[str] = None
+    ) -> Optional[PaymentMethodResponse]:
+        pass
+
+    # Vendors
+    @abstractmethod
+    def list_vendors(self) -> List[VendorResponse]:
+        pass
+
+    @abstractmethod
+    def create_vendor(self, vendor_data: VendorCreate) -> VendorResponse:
+        pass
+
+    # Peripherals
+    @abstractmethod
+    def list_peripherals(self) -> List[PeripheralResponse]:
+        pass
+
+    @abstractmethod
+    def get_peripheral(self, peripheral_id: str) -> Optional[PeripheralResponse]:
+        pass
+
+    @abstractmethod
+    def create_peripheral(self, item_data: PeripheralCreate) -> PeripheralResponse:
+        pass
+
+    @abstractmethod
+    def update_peripheral(
+        self, peripheral_id: str, updates: PeripheralUpdate
+    ) -> Optional[PeripheralResponse]:
+        pass
+
+    @abstractmethod
+    def delete_peripheral(self, peripheral_id: str) -> bool:
+        pass
+
     # Audit Logging
     @abstractmethod
     def log_audit_event(self, entry: AuditLogEntry) -> None:
         pass
-
-

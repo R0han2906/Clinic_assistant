@@ -85,3 +85,13 @@ def add_patient_visit(
     if visit_in.patient_id.lower() != patient_id.lower():
         visit_in.patient_id = patient_id
     return visit_service.record_visit_summary(visit_in)
+
+@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_patient_profile(
+    patient_id: str,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """Deletes a patient record."""
+    patient_service.delete_patient(patient_id)
+    return None
+

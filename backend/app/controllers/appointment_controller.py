@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status, Body
 from app.models.appointment import (
     AppointmentCreate, AppointmentReschedule, AppointmentResponse, AppointmentStatus,
-    PaymentStatusUpdate, PaymentReminderResponse
+    AppointmentStatusUpdate, PaymentStatusUpdate, PaymentReminderResponse
 )
 from app.services import get_booking_service, BookingService
 
@@ -95,6 +95,36 @@ def update_payment(
         bill_number=payload.bill_number
     )
 
+@router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
+def update_status(
+    appointment_id: str,
+    payload: AppointmentStatusUpdate,
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """Transitions appointment to a canonical status (scheduled, checked-in, in-progress, completed, paid, cancelled, no-show)."""
+    return booking_service.update_appointment_status(
+        appointment_id=appointment_id,
+        new_status=payload.status,
+        notes=payload.notes
+    )
+
+@router.get("/{appointment_id}/visit-summary")
+def get_visit_summary(
+    appointment_id: str,
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """Retrieves structured clinical summary for an appointment."""
+    return booking_service.get_visit_summary(appointment_id)
+
+@router.post("/{appointment_id}/visit-summary")
+def save_visit_summary(
+    appointment_id: str,
+    payload: dict = Body(..., description="Clinical visit summary fields"),
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """Saves or updates clinical visit summary for an appointment."""
+    return booking_service.save_visit_summary(appointment_id, payload)
+
 @router.post("/{appointment_id}/remind-payment", response_model=PaymentReminderResponse)
 def remind_payment(
     appointment_id: str,
@@ -105,4 +135,15 @@ def remind_payment(
     Records the reminder event in the audit log.
     """
     return booking_service.send_payment_reminder(appointment_id)
+
+@router.patch("/{appointment_id}", response_model=AppointmentResponse)
+def update_appointment(
+    appointment_id: str,
+    updates: dict = Body(..., description="Fields to update on appointment"),
+    booking_service: BookingService = Depends(get_booking_service)
+):
+    """Updates general fields of an appointment (notes, treatment, etc.)."""
+    return booking_service.update_appointment(appointment_id, updates)
+
+
 

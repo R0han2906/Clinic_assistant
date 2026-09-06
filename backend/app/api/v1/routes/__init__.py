@@ -12,6 +12,12 @@ from .appointment_routes import router as appointment_router
 from .treatment_routes import router as treatment_router
 from .checkup_routes import router as checkup_router
 from .patient_request_routes import router as patient_request_router
+from .sales_routes import router as sales_router
+from .inventory_routes import router as inventory_router
+from .purchase_routes import router as purchase_router
+from .staff_routes import router as staff_router
+from .export_routes import router as export_router
+from .peripheral_routes import router as peripheral_router
 
 __all__ = [
     "health_router",
@@ -22,5 +28,11 @@ __all__ = [
     "appointment_router",
     "treatment_router",
     "checkup_router",
-    "patient_request_router"
+    "patient_request_router",
+    "sales_router",
+    "inventory_router",
+    "purchase_router",
+    "staff_router",
+    "export_router",
+    "peripheral_router"
 ]

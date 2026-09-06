@@ -22,7 +22,12 @@ from app.models.appointment import (
     PaymentReminderResponse
 )
 from app.models.audit import AuditLogEntry
-from app.models.treatment import Treatment
+from app.models.treatment import Treatment, TreatmentCreate, TreatmentUpdate, TreatmentResponse
+from app.models.staff import StaffMember, StaffCreate, StaffUpdate
+from app.models.sales import SaleResponse, SaleCreate, SaleSummary, PaymentMethodResponse
+from app.models.purchase import PurchaseResponse, PurchaseCreate, VendorResponse, VendorCreate
+from app.models.inventory import InventoryResponse, InventoryCreate, InventoryUpdate
+from app.models.peripheral import PeripheralResponse, PeripheralCreate, PeripheralUpdate
 from app.models.medical_checkup import (
     MedicalCheckupCreate, MedicalCheckupResponse, ToothFinding
 )
@@ -36,7 +41,7 @@ from app.repositories.excel_schema import (
     SHEET_LEAVES, SHEET_APPOINTMENTS, SHEET_STAFF, SHEET_AUDIT, SHEET_METADATA,
     SHEET_CHECKUPS, SHEET_TREATMENTS, SHEET_PATIENT_REQUESTS,
     DEFAULT_DENTISTS, DEFAULT_AVAILABILITY, DEFAULT_METADATA,
-    DEFAULT_TREATMENTS
+    DEFAULT_TREATMENTS, DEFAULT_PATIENTS, DEFAULT_APPOINTMENTS
 )
 
 
@@ -65,7 +70,16 @@ class ExcelClinicRepository(BaseClinicRepository):
             if auto_backup is not None
             else getattr(settings, "AUTO_BACKUP_ON_SAVE", False)
         )
+        self._treatments = {}
+        self._staff = {}
+        self._sales = {}
+        self._purchases = {}
+        self._inventory = {}
+        self._vendors = {}
+        self._payment_methods = {}
+        self._peripherals = {}
         self.initialize_storage()
+        self._ensure_runtime_defaults()
 
     # =========================================================================
     # INITIALIZATION & HEALTH
@@ -162,6 +176,42 @@ class ExcelClinicRepository(BaseClinicRepository):
 
         self._auto_fit_columns(wb)
         self._save_workbook_atomic(wb)
+
+    def seed_demo_data(self) -> None:
+        """
+        Explicitly populates demo patients and appointments for local frontend testing.
+        Never called automatically during test fixture creation.
+        """
+        with get_workbook_lock(self.lock_path):
+            wb = openpyxl.load_workbook(self.workbook_path)
+            try:
+                # Seed initial patients if sheet is empty
+                ws_patients = wb[SHEET_PATIENTS]
+                if ws_patients.max_row <= 1:
+                    for p in DEFAULT_PATIENTS:
+                        ws_patients.append([
+                            p["patient_id"], p["full_name"], p["dob_or_age"], p["phone"],
+                            p["email"], p["emergency_contact"], p["gender"], p["address"],
+                            p["allergies"], p["medical_conditions"], p["consent_status"],
+                            p["created_at"], p["updated_at"]
+                        ])
+
+                # Seed initial appointments if sheet is empty
+                ws_appts = wb[SHEET_APPOINTMENTS]
+                if ws_appts.max_row <= 1:
+                    for ap in DEFAULT_APPOINTMENTS:
+                        ws_appts.append([
+                            ap["appointment_id"], ap["patient_id"], ap["dentist_id"],
+                            ap["date"], ap["start_time"], ap["end_time"], ap["booking_time"],
+                            ap["treatment_name"], ap["source"], ap["payment_status"],
+                            ap["bill_number"], ap["clinical_notes"], ap["status"],
+                            ap["reason"], ap["notes"], ap["created_at"], ap["updated_at"]
+                        ])
+
+                self._auto_fit_columns(wb)
+                self._save_workbook_atomic(wb)
+            finally:
+                wb.close()
 
     def _auto_fit_columns(self, wb: openpyxl.Workbook) -> None:
         for ws in wb.worksheets:
@@ -552,12 +602,60 @@ class ExcelClinicRepository(BaseClinicRepository):
             all_data = self._read_all_sheets()
             return self._get_dentist_unlocked(all_data, dentist_id)
 
+    def get_visit_by_appointment(self, appointment_id: str) -> Optional[VisitResponse]:
+        with get_workbook_lock(self.lock_path):
+            all_data = self._read_all_sheets()
+            visits_rows = all_data.get(SHEET_VISITS, [])
+            dentists_map = {
+                d.get("dentist_id"): d.get("name")
+                for d in all_data.get(SHEET_DENTISTS, [])
+            }
+            for r in visits_rows:
+                if str(r.get("appointment_id", "")).lower() == appointment_id.lower():
+                    return VisitResponse(
+                        visit_id=r.get("visit_id", ""),
+                        patient_id=r.get("patient_id", ""),
+                        visit_date=r.get("visit_date", ""),
+                        dentist_id=r.get("dentist_id", ""),
+                        dentist_name=dentists_map.get(r.get("dentist_id", "")),
+                        visit_type=r.get("visit_type", ""),
+                        summary=r.get("summary", ""),
+                        follow_up_recommendation=r.get("follow_up_recommendation") or None,
+                        created_at=r.get("created_at", "")
+                    )
+            apt_rows = all_data.get(SHEET_APPOINTMENTS, [])
+            target_apt = next((a for a in apt_rows if a.get("appointment_id", "").lower() == appointment_id.lower()), None)
+            if target_apt:
+                p_id = target_apt.get("patient_id")
+                a_date = target_apt.get("date")
+                for r in reversed(visits_rows):
+                    if r.get("patient_id") == p_id and r.get("visit_date") == a_date:
+                        return VisitResponse(
+                            visit_id=r.get("visit_id", ""),
+                            patient_id=r.get("patient_id", ""),
+                            visit_date=r.get("visit_date", ""),
+                            dentist_id=r.get("dentist_id", ""),
+                            dentist_name=dentists_map.get(r.get("dentist_id", "")),
+                            visit_type=r.get("visit_type", ""),
+                            summary=r.get("summary", ""),
+                            follow_up_recommendation=r.get("follow_up_recommendation") or None,
+                            created_at=r.get("created_at", "")
+                        )
+            return None
+
     def _get_dentist_unlocked(
         self, all_data: Dict, dentist_id: str
     ) -> Optional[DentistResponse]:
-        """Finds a dentist by ID from already-loaded data. No lock."""
+        """Finds a dentist by ID or short alias (d1, d2, d3). No lock."""
+        id_lower = dentist_id.lower()
+        alias_map = {
+            "d1": "doc-000001",
+            "d2": "doc-000002",
+            "d3": "doc-000003",
+        }
+        target_id = alias_map.get(id_lower, id_lower)
         for d in self._list_dentists_unlocked(all_data, active_only=False):
-            if d.dentist_id.lower() == dentist_id.lower():
+            if d.dentist_id.lower() == target_id or d.dentist_id.lower() == id_lower:
                 return d
         return None
 
@@ -863,11 +961,17 @@ class ExcelClinicRepository(BaseClinicRepository):
             dentists_map = {d.get("dentist_id"): d.get("name") for d in all_data.get(SHEET_DENTISTS, [])}
 
             # Conflict double-check under lock using in-memory data (no extra lock)
+            alias_map = {"d1": "DOC-000001", "d2": "DOC-000002", "d3": "DOC-000003"}
+            target_dentist_id = alias_map.get(appointment_data.dentist_id.lower(), appointment_data.dentist_id)
+
             for r in apt_rows:
+                r_doc = r.get("dentist_id", "").lower()
                 if (
-                    r.get("dentist_id", "").lower() == appointment_data.dentist_id.lower()
+                    (r_doc == appointment_data.dentist_id.lower() or r_doc == target_dentist_id.lower())
                     and r.get("date") == appointment_data.date
-                    and r.get("status", "").lower() in ["confirmed", "pending", "registered"]
+                    and r.get("status", "").lower().replace("_", "-") in [
+                        "confirmed", "pending", "registered", "scheduled", "checked-in", "in-progress"
+                    ]
                 ):
                     existing_start = r.get("start_time", "")
                     existing_end = r.get("end_time", "")
@@ -886,11 +990,14 @@ class ExcelClinicRepository(BaseClinicRepository):
             booking_timestamp = appointment_data.booking_time or now_iso
             treatment = appointment_data.treatment_name or "General Checkup"
             bill_ref = appointment_data.bill_number or f"Bill #{10100 + seq}"
+            stat_val = appointment_data.status or "confirmed"
+            if hasattr(stat_val, "value"):
+                stat_val = stat_val.value
 
             new_row = {
                 "appointment_id": apt_id,
                 "patient_id": appointment_data.patient_id,
-                "dentist_id": appointment_data.dentist_id,
+                "dentist_id": target_dentist_id,
                 "date": appointment_data.date,
                 "start_time": appointment_data.start_time,
                 "end_time": appointment_data.end_time,
@@ -900,7 +1007,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "payment_status": appointment_data.payment_status or "UNPAID",
                 "bill_number": bill_ref,
                 "clinical_notes": appointment_data.clinical_notes or "",
-                "status": "confirmed",
+                "status": str(stat_val),
                 "reason": appointment_data.reason or "",
                 "notes": appointment_data.notes or "",
                 "created_at": now_iso,
@@ -919,7 +1026,7 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "action": "CREATE",
                 "details": (
                     f"Booked {treatment} for patient {appointment_data.patient_id} "
-                    f"with dentist {appointment_data.dentist_id} "
+                    f"with dentist {target_dentist_id} "
                     f"on {appointment_data.date} "
                     f"({appointment_data.start_time}-{appointment_data.end_time})"
                 )
@@ -929,13 +1036,14 @@ class ExcelClinicRepository(BaseClinicRepository):
             self._write_all_sheets(all_data)
 
         p_info = patients_map.get(appointment_data.patient_id, {})
+        dentist_display_name = dentists_map.get(target_dentist_id) or dentists_map.get(appointment_data.dentist_id)
         return AppointmentResponse(
             appointment_id=apt_id,
             patient_id=appointment_data.patient_id,
             patient_name=p_info.get("full_name"),
             patient_phone=p_info.get("phone"),
-            dentist_id=appointment_data.dentist_id,
-            dentist_name=dentists_map.get(appointment_data.dentist_id),
+            dentist_id=target_dentist_id,
+            dentist_name=dentist_display_name,
             date=appointment_data.date,
             start_time=appointment_data.start_time,
             end_time=appointment_data.end_time,
@@ -944,7 +1052,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             payment_status=appointment_data.payment_status or "UNPAID",
             bill_number=bill_ref,
             clinical_notes=appointment_data.clinical_notes,
-            status=AppointmentStatus.CONFIRMED,
+            status=AppointmentStatus(stat_val),
             reason=appointment_data.reason,
             notes=appointment_data.notes,
             booking_time=booking_timestamp,
@@ -969,8 +1077,9 @@ class ExcelClinicRepository(BaseClinicRepository):
             if not target:
                 return None
 
+            status_val = new_status.value if hasattr(new_status, "value") else str(new_status)
             now_iso = datetime.now().isoformat()
-            target["status"] = new_status.value
+            target["status"] = status_val
             target["updated_at"] = now_iso
             if notes:
                 existing_notes = target.get("notes", "")
@@ -983,8 +1092,8 @@ class ExcelClinicRepository(BaseClinicRepository):
                 "staff_id": "staff_reception",
                 "entity_type": "APPOINTMENT",
                 "entity_id": appointment_id,
-                "action": f"STATUS_{new_status.value.upper()}",
-                "details": f"Status updated to {new_status.value}"
+                "action": f"STATUS_{status_val.upper().replace('-', '_')}",
+                "details": f"Status updated to {status_val}"
             })
             all_data[SHEET_AUDIT] = audit_rows
 
@@ -1234,7 +1343,7 @@ class ExcelClinicRepository(BaseClinicRepository):
             now_iso = datetime.now().isoformat()
 
             # Serialize teeth findings and medical conditions
-            teeth_json = json.dumps([t.dict() for t in checkup_data.teeth_findings])
+            teeth_json = json.dumps([t.model_dump() if hasattr(t, "model_dump") else t.dict() for t in checkup_data.teeth_findings])
             conditions_json = json.dumps(checkup_data.medical_conditions)
 
             # Check if updating existing checkup for this appointment
@@ -1470,5 +1579,321 @@ class ExcelClinicRepository(BaseClinicRepository):
 
             self._write_all_sheets(all_data)
             return self._deserialize_patient_request_row(target)
+
+    # ── Fallback Implementations for New Abstract Methods ───
+    def delete_patient(self, patient_id: str) -> bool:
+        return False
+
+    def update_appointment(self, appointment_id: str, updates: Dict[str, Any]) -> Optional[AppointmentResponse]:
+        return self.get_appointment(appointment_id)
+
+    def get_treatment(self, treatment_id: str) -> Optional[Treatment]:
+        if treatment_id in self._treatments:
+            return self._treatments[treatment_id]
+        for t in self.list_treatments():
+            if t.treatment_id == treatment_id:
+                return t
+        return None
+
+    def create_treatment(self, treatment_data: TreatmentCreate) -> Treatment:
+        tid = f"TRT-{len(self._treatments) + 10:06d}"
+        t = Treatment(
+            treatment_id=tid,
+            name=treatment_data.name,
+            category=treatment_data.category or "General",
+            default_duration_minutes=treatment_data.default_duration_minutes or 30,
+            estimated_cost=treatment_data.estimated_cost,
+            description=treatment_data.description
+        )
+        self._treatments[tid] = t
+        return t
+
+    def update_treatment(self, treatment_id: str, updates: TreatmentUpdate) -> Optional[Treatment]:
+        t = self.get_treatment(treatment_id)
+        if not t:
+            return None
+        t_dict = t.model_dump()
+        t_dict.update(updates.model_dump(exclude_unset=True))
+        updated = Treatment(**t_dict)
+        self._treatments[treatment_id] = updated
+        return updated
+
+    def delete_treatment(self, treatment_id: str) -> bool:
+        if treatment_id in self._treatments:
+            del self._treatments[treatment_id]
+        return True
+
+    def list_staff(self, active_only: bool = False) -> List[StaffMember]:
+        base_staff = [
+            StaffMember(staff_id="STF-000001", username="admin", full_name="Emma Watson", role="Clinic Manager", department="Administration", initials="EW", status="Active", is_active=True),
+            StaffMember(staff_id="STF-000002", username="receptionist1", full_name="Jessica Taylor", role="Head Receptionist", department="Front Desk", initials="JT", status="Active", is_active=True),
+            StaffMember(staff_id="STF-000003", username="nurse1", full_name="Alex Robinson", role="Senior Dental Assistant", department="Nursing", initials="AR", status="Active", is_active=True),
+        ]
+        all_s = {s.staff_id: s for s in base_staff}
+        all_s.update(self._staff)
+        res = list(all_s.values())
+        if active_only:
+            res = [s for s in res if s.is_active and s.status == "Active"]
+        return res
+
+    def get_staff(self, staff_id: str) -> Optional[StaffMember]:
+        if staff_id in self._staff:
+            return self._staff[staff_id]
+        for s in self.list_staff():
+            if s.staff_id == staff_id:
+                return s
+        return None
+
+    def create_staff(self, staff_data: StaffCreate) -> StaffMember:
+        sid = f"STF-{len(self._staff) + 10:06d}"
+        parts = staff_data.full_name.strip().split()
+        initials = "".join([p[0].upper() for p in parts if p])[:2] or "ST"
+        s = StaffMember(
+            staff_id=sid,
+            full_name=staff_data.full_name,
+            role=staff_data.role,
+            department=staff_data.department,
+            phone=staff_data.phone,
+            email=staff_data.email,
+            initials=initials,
+            status="Active",
+            is_active=True
+        )
+        self._staff[sid] = s
+        return s
+
+    def update_staff(self, staff_id: str, updates: StaffUpdate) -> Optional[StaffMember]:
+        s = self.get_staff(staff_id)
+        if not s:
+            return None
+        d = s.model_dump()
+        d.update(updates.model_dump(exclude_unset=True))
+        updated = StaffMember(**d)
+        self._staff[staff_id] = updated
+        return updated
+
+    def delete_staff(self, staff_id: str) -> bool:
+        if staff_id in self._staff:
+            del self._staff[staff_id]
+        return True
+
+    def list_sales(self, date: Optional[str] = None, patient_id: Optional[str] = None, status: Optional[str] = None) -> List[SaleResponse]:
+        res = list(self._sales.values())
+        if status:
+            res = [s for s in res if s.status.lower() == status.lower()]
+        return res
+
+    def get_sale(self, sale_id: str) -> Optional[SaleResponse]:
+        return self._sales.get(sale_id)
+
+    def create_sale(self, sale_data: SaleCreate) -> SaleResponse:
+        sid = f"SAL-{len(self._sales) + 1:06d}"
+        s = SaleResponse(
+            sale_id=sid,
+            patient_name=sale_data.patient_name,
+            treatment_name=sale_data.treatment_name,
+            amount=sale_data.amount,
+            status=sale_data.status or "Pending",
+            payment_method=sale_data.payment_method or "Cash",
+            notes=sale_data.notes,
+            created_at=datetime.now().isoformat()
+        )
+        self._sales[sid] = s
+        return s
+
+    def update_sale_status(self, sale_id: str, status: str) -> Optional[SaleResponse]:
+        s = self._sales.get(sale_id)
+        if s:
+            d = s.model_dump()
+            d["status"] = status
+            updated = SaleResponse(**d)
+            self._sales[sale_id] = updated
+            return updated
+        return None
+
+    def get_sales_summary(self) -> SaleSummary:
+        sales = list(self._sales.values())
+        total_revenue = sum(s.amount for s in sales if s.status == "Paid")
+        total_pending = sum(s.amount for s in sales if s.status != "Paid")
+        return SaleSummary(
+            total_sales=len(sales),
+            total_paid=total_revenue,
+            total_pending=total_pending
+        )
+
+    def list_vendors(self) -> List[VendorResponse]:
+        return list(self._vendors.values())
+
+    def create_vendor(self, vendor_data: VendorCreate) -> VendorResponse:
+        vid = f"VND-{len(self._vendors) + 1:06d}"
+        v = VendorResponse(
+            vendor_id=vid,
+            name=vendor_data.name,
+            contact=vendor_data.contact,
+            email=vendor_data.email,
+            phone=vendor_data.phone,
+            address=vendor_data.address,
+            created_at=datetime.now().isoformat()
+        )
+        self._vendors[vid] = v
+        return v
+
+    def list_purchases(self, status: Optional[str] = None) -> List[PurchaseResponse]:
+        res = list(self._purchases.values())
+        if status:
+            res = [p for p in res if p.status.lower() == status.lower()]
+        return res
+
+    def get_purchase(self, purchase_id: str) -> Optional[PurchaseResponse]:
+        return self._purchases.get(purchase_id)
+
+    def create_purchase(self, purchase_data: PurchaseCreate) -> PurchaseResponse:
+        pid = f"PO-{len(self._purchases) + 1:06d}"
+        p = PurchaseResponse(
+            purchase_id=pid,
+            vendor_name=purchase_data.vendor_name,
+            items=purchase_data.items,
+            amount=purchase_data.amount,
+            status=purchase_data.status or "Ordered",
+            created_at=datetime.now().isoformat()
+        )
+        self._purchases[pid] = p
+        return p
+
+    def update_purchase_status(self, purchase_id: str, status: str, received_date: Optional[str] = None) -> Optional[PurchaseResponse]:
+        p = self._purchases.get(purchase_id)
+        if p:
+            d = p.model_dump()
+            d["status"] = status
+            if received_date:
+                d["received_date"] = received_date
+            updated = PurchaseResponse(**d)
+            self._purchases[purchase_id] = updated
+            return updated
+        return None
+
+    def list_inventory(self, category: Optional[str] = None, low_stock_only: bool = False) -> List[InventoryResponse]:
+        res = list(self._inventory.values())
+        if category:
+            res = [i for i in res if i.category.lower() == category.lower()]
+        if low_stock_only:
+            res = [i for i in res if i.quantity <= i.min_stock]
+        return res
+
+    def get_inventory_item(self, item_id: str) -> Optional[InventoryResponse]:
+        return self._inventory.get(item_id)
+
+    def create_inventory_item(self, item_data: InventoryCreate) -> InventoryResponse:
+        iid = f"INV-{len(self._inventory) + 1:06d}"
+        item = InventoryResponse(
+            item_id=iid,
+            name=item_data.name,
+            category=item_data.category or "Consumables",
+            quantity=item_data.quantity or 0,
+            min_stock=item_data.min_stock or 0,
+            unit=item_data.unit or "pcs",
+            unit_price=item_data.unit_price or 0.0,
+            supplier=item_data.supplier,
+            created_at=datetime.now().isoformat()
+        )
+        self._inventory[iid] = item
+        return item
+
+    def update_inventory_item(self, item_id: str, updates: InventoryUpdate) -> Optional[InventoryResponse]:
+        item = self._inventory.get(item_id)
+        if item:
+            d = item.model_dump()
+            d.update(updates.model_dump(exclude_unset=True))
+            updated = InventoryResponse(**d)
+            self._inventory[item_id] = updated
+            return updated
+        return None
+
+    def delete_inventory_item(self, item_id: str) -> bool:
+        if item_id in self._inventory:
+            del self._inventory[item_id]
+        return True
+
+    def list_payment_methods(self) -> List[PaymentMethodResponse]:
+        return list(self._payment_methods.values())
+
+    def update_payment_method(self, method_id: str, enabled: Optional[bool] = None, processing_fee: Optional[str] = None) -> Optional[PaymentMethodResponse]:
+        pm = self._payment_methods.get(method_id)
+        if pm:
+            d = pm.model_dump()
+            if enabled is not None:
+                d["is_active"] = enabled
+            if processing_fee is not None:
+                d["processing_fee"] = processing_fee
+            updated = PaymentMethodResponse(**d)
+            self._payment_methods[method_id] = updated
+            return updated
+        return None
+
+    def _ensure_runtime_defaults(self) -> None:
+        if not self._vendors:
+            for name in ["DentSupply Co.", "Medix Pharma", "BioTech Dental", "Global Dental Direct"]:
+                self.create_vendor(VendorCreate(name=name))
+        if not self._peripherals:
+            defaults = [
+                ("Dental Chair #1", "Chair", "Room 1", "Good", "DC-2021-001", "2024-02-15"),
+                ("Dental Chair #2", "Chair", "Room 2", "Good", "DC-2021-002", "2024-02-15"),
+                ("Dental X-Ray Machine", "Imaging", "Room 1", "Good", "XR-2020-007", "2024-03-20"),
+                ("Digital Panoramic X-Ray", "Imaging", "X-Ray", "Service", "PX-2019-003", "2023-11-10"),
+                ("Autoclave Sterilizer", "Sterilization", "Lab", "Good", "AC-2022-001", "2024-01-08"),
+                ("Intraoral Camera", "Imaging", "Room 2", "Good", "IC-2023-005", "2024-04-05"),
+                ("Dental Compressor", "Equipment", "Utility", "Good", "CP-2021-002", "2024-01-22"),
+                ("Patient Monitor #1", "Monitor", "Room 1", "Good", "PM-2022-001", "2024-03-15"),
+                ("Reception Computer", "IT", "Front", "Good", "PC-2023-001", "2024-04-20"),
+                ("Billing Printer", "IT", "Front", "Needs Check", "PR-2020-004", "2023-08-01"),
+            ]
+            for name, category, location, condition, serial_no, last_service in defaults:
+                self.create_peripheral(PeripheralCreate(
+                    name=name,
+                    category=category,
+                    location=location,
+                    condition=condition,
+                    serial_no=serial_no,
+                    last_service=last_service,
+                ))
+
+    def list_peripherals(self) -> List[PeripheralResponse]:
+        return list(self._peripherals.values())
+
+    def get_peripheral(self, peripheral_id: str) -> Optional[PeripheralResponse]:
+        return self._peripherals.get(peripheral_id)
+
+    def create_peripheral(self, item_data: PeripheralCreate) -> PeripheralResponse:
+        pid = f"PER-{len(self._peripherals) + 1:06d}"
+        item = PeripheralResponse(
+            peripheral_id=pid,
+            name=item_data.name,
+            category=item_data.category or "Equipment",
+            location=item_data.location or "",
+            condition=item_data.condition or "Good",
+            serial_no=item_data.serial_no,
+            last_service=item_data.last_service,
+            created_at=datetime.now().isoformat(),
+        )
+        self._peripherals[pid] = item
+        return item
+
+    def update_peripheral(self, peripheral_id: str, updates: PeripheralUpdate) -> Optional[PeripheralResponse]:
+        item = self._peripherals.get(peripheral_id)
+        if not item:
+            return None
+        d = item.model_dump()
+        d.update(updates.model_dump(exclude_unset=True))
+        updated = PeripheralResponse(**d)
+        self._peripherals[peripheral_id] = updated
+        return updated
+
+    def delete_peripheral(self, peripheral_id: str) -> bool:
+        if peripheral_id in self._peripherals:
+            del self._peripherals[peripheral_id]
+            return True
+        return False
+
+
 
 

@@ -644,22 +644,121 @@ Book a new appointment. Automatically conflict-checks the dentist's schedule und
 ---
 
 ### `PATCH /api/appointments/{appointment_id}/payment`
-Update the payment and billing status of an appointment.
+Update the payment and billing status of an appointment. If an appointment is in `completed` status and `payment_status` is updated to `PAID`, the appointment status is automatically advanced to `paid`.
 
 **Request body:**
 ```json
 {
-  "payment_status": "paid",
+  "payment_status": "PAID",
   "bill_number": "INV-2026-001"
 }
 ```
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `payment_status` | string | ✅ | `unpaid`, `paid`, `refunded`, `pending` |
-| `bill_number` | string | No | Optional invoice tracking code |
+| `payment_status` | string | ✅ | `UNPAID`, `PAID`, `WAITING_PAYMENT`, `REFUNDED` |
+| `bill_number` | string | No | Optional invoice tracking code (e.g. `Bill #10102`) |
 
 **Response `200`:** Updated Appointment object.
+
+---
+
+### `PATCH /api/appointments/{appointment_id}/status`
+Transitions an appointment across the **canonical 7 states** of the Zendenta v3 receptionist lifecycle:
+`scheduled` → `checked-in` → `in-progress` → `completed` → `paid` (with `cancelled` and `no-show` branches).
+
+**Allowed Transitions Table:**
+| Current State | Allowed Next States |
+|---|---|
+| `scheduled` | `checked-in`, `in-progress`, `cancelled`, `no-show` |
+| `checked-in` | `in-progress`, `cancelled`, `no-show`, `scheduled` |
+| `in-progress` | `completed`, `cancelled` |
+| `completed` | `paid` |
+| `paid` | Terminal (no further transitions) |
+| `cancelled` | Terminal (no further transitions) |
+| `no-show` | Terminal (no further transitions) |
+
+**Request body:**
+```json
+{
+  "status": "checked-in",
+  "notes": "Patient arrived at reception and verified insurance"
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | string | ✅ | One of: `scheduled`, `checked-in`, `in-progress`, `completed`, `paid`, `cancelled`, `no-show` |
+| `notes` | string | No | Transition audit note appended to appointment history |
+
+**Response `200`:** Updated Appointment object.  
+**Response `400`:** `INVALID_TRANSITION` — illegal transition requested.
+
+---
+
+### `GET /api/appointments/{appointment_id}/visit-summary`
+Retrieves structured clinical summary for an appointment. If a clinical visit has not been finalized yet, generates a structured clinical draft containing chief complaint, diagnosis, prescriptions, follow-up, and itemized billing.
+
+**Response `200`:**
+```json
+{
+  "appointment_id": "APT-000001",
+  "patient_id": "PAT-000001",
+  "patient_name": "Rafli Jainudin",
+  "dentist_id": "DOC-000001",
+  "dentist_name": "Drg Soap Mactavish",
+  "date": "2026-09-06",
+  "treatment_name": "Teeth Cleaning & Scaling",
+  "chief_complaint": "Routine checkup and plaque removal",
+  "diagnosis": "Healthy dentition, mild gingival inflammation resolved",
+  "prescriptions": [],
+  "treatments_performed": ["Teeth Cleaning & Scaling", "Polishing"],
+  "follow_up": {
+    "timeframe": "6 months",
+    "notes": "Routine follow-up cleaning"
+  },
+  "dentist_notes": "Scaling completed smoothly. Oral hygiene instructions provided.",
+  "billing": {
+    "bill_number": "Bill #10101",
+    "amount": 120.0,
+    "status": "PAID"
+  }
+}
+```
+
+---
+
+### `POST /api/appointments/{appointment_id}/visit-summary`
+Persists or updates the clinical visit summary for an appointment, synchronizing the appointment's clinical notes banner and storing a persistent record in the Visits table.
+
+**Request body:**
+```json
+{
+  "chief_complaint": "Severe toothache on lower left molar",
+  "diagnosis": "Reversible pulpitis",
+  "prescriptions": [
+    {
+      "name": "Ibuprofen 400mg",
+      "dosage": "1 tablet 3x daily",
+      "duration": "3 days",
+      "notes": "Take after meals"
+    }
+  ],
+  "treatments_performed": ["Caries excavation", "Provisional restoration"],
+  "follow_up": {
+    "timeframe": "2 weeks",
+    "notes": "Permanent composite filling review"
+  },
+  "dentist_notes": "Cavity debrided and sealed. Patient reported pain relief.",
+  "billing": {
+    "bill_number": "Bill #10105",
+    "amount": 180.0,
+    "status": "UNPAID"
+  }
+}
+```
+
+**Response `200`:** Updated `ClinicalVisitSummary` object.
 
 ---
 

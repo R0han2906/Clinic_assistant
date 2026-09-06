@@ -1,6 +1,9 @@
+import type { AppointmentStatus as LifecycleStatus } from '@/lib/appointment-lifecycle'
+
 // ─── Appointment ──────────────────────────────────────────────────────────────
 
 export type AppointmentStatus =
+  | LifecycleStatus
   | 'Finished'
   | 'Registered'
   | 'Waiting payment'
@@ -10,6 +13,52 @@ export type AppointmentStatus =
 export type AppointmentColor = 'rose' | 'sage' | 'sky' | 'amber' | 'purple'
 
 export type Gender = 'Male' | 'Female'
+
+export interface PrescriptionItem {
+  medication: string
+  dosage: string
+  duration: string
+  pharmacyPickup?: boolean
+}
+
+export interface BillingItem {
+  name: string
+  price: number
+}
+
+export interface BillingSummary {
+  items: BillingItem[]
+  total: number
+  paid: boolean
+  paidAt?: string
+  billNumber?: string
+}
+
+export interface VisitSummary {
+  chiefComplaint: string
+  diagnosis: string
+  prescriptions: PrescriptionItem[]
+  treatmentsPerformed: string[]
+  followUp: {
+    recommended: boolean
+    timeframe: string
+    notes?: string
+  }
+  dentistNotes: string
+  billing: BillingSummary
+}
+
+export interface WaitingPatient {
+  id: string
+  patientId: string
+  patientName: string
+  phone?: string
+  dentistName: string
+  dentistId: string
+  treatment: string
+  checkedInAt: string
+  priority?: 'normal' | 'urgent'
+}
 
 export interface Appointment {
   id: string
@@ -24,6 +73,11 @@ export interface Appointment {
   dentist: string
   dentistId: string
   notes?: string
+  patientPhone?: string
+  patientEmail?: string
+  patientAge?: number
+  billNumber?: string
+  visitSummary?: VisitSummary
 }
 
 // ─── Dentist ──────────────────────────────────────────────────────────────────

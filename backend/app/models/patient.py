@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class PatientBase(BaseModel):
     full_name: str = Field(..., min_length=1, description="Patient's full legal or preferred name")
-    dob_or_age: str = Field(..., description="Date of birth (YYYY-MM-DD) or age in years")
+    dob_or_age: Optional[str] = Field("Unknown", description="Date of birth (YYYY-MM-DD) or age in years")
     phone: str = Field(..., min_length=7, description="Primary contact phone number")
     email: Optional[str] = Field(None, description="Optional contact email")
     emergency_contact: Optional[str] = Field(None, description="Optional emergency contact name/phone")

@@ -1,0 +1,50 @@
+# =============================================================================
+# Backend .gitignore - FastAPI Core
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Environments
+.env
+.env.*
+.env.example
+*.env.example
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Data, Backups & Lockfiles
+data/backups/
+data/*.xlsx.lock
+data/*.lock
+*.lock
+
+# Logs
+*.log
+logs/
+
+# User-specified / Scratch
+powershell.cmd
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

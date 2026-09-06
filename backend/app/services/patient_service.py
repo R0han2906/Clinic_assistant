@@ -71,3 +71,11 @@ class PatientService:
         if not updated:
             raise ResourceNotFoundError("Patient", patient_id)
         return updated
+
+    def delete_patient(self, patient_id: str) -> bool:
+        """Deletes a patient record."""
+        patient = self.repository.get_patient(patient_id)
+        if not patient:
+            raise ResourceNotFoundError("Patient", patient_id)
+        return self.repository.delete_patient(patient_id)
+

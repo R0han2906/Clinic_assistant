@@ -4,8 +4,8 @@ import './globals.css'
 import { LayoutShell } from '@/components/layout/LayoutShell'
 
 export const metadata: Metadata = {
-  title: 'Zendenta — Dental Clinic Management',
-  description: 'A responsive dental clinic management SaaS for receptionists.',
+  title: 'Clinix — Dental Clinic Management',
+  description: 'A modern, responsive dental clinic management SaaS for receptionists.',
   icons: {
     icon: [
       { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },

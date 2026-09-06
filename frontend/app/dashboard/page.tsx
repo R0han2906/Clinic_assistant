@@ -1,408 +1,785 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  CalendarDays, TrendingUp, TrendingDown, Users, DollarSign,
-  Printer, Plus, UserPlus, Clock, CheckCircle2,
-  Bell, AlertCircle, FileText, Phone, MessageSquare,
-  ArrowRight,
+  CalendarDays, Users, DollarSign,
+  Plus, Clock,
+  Bell, UserCheck, Stethoscope, ChevronRight, Check, X
 } from 'lucide-react'
-import { appointments, dentists, activities, alerts, kpiData } from '@/lib/mock-data'
-import { formatRelativeTime, getInitials } from '@/lib/formatters'
-import type { KpiData, Activity, Alert } from '@/types'
+import { api } from '@/lib/api-client'
+import {
+  DentistResponse,
+  SaleSummary,
+  PatientRequestResponse
+} from '@/types/api'
+import dynamic from 'next/dynamic'
+import { WaitingPatient } from '@/types'
+import {
+  normalizeStatus,
+  getStatusMeta
+} from '@/lib/appointment-lifecycle'
+import { PatientAvatar } from '@/components/patients/PatientAvatar'
+import { DashboardQuickActions } from '@/components/dashboard/DashboardQuickActions'
 
-export const dynamic = 'force-static'
-
-// ─── Greeting Header ─────────────────────────────────────────────────────────
-
-function GreetingHeader() {
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Good morning, Darrell 👋
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          You have <strong className="text-foreground">16 appointments</strong> today, 2 walk-ins waiting
-        </p>
-      </div>
-      <div className="flex gap-3">
-        <Link
-          href="/reservations"
-          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[0.98]"
-        >
-          <Plus className="size-4" /> New Appointment
-        </Link>
-        <button className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold transition hover:bg-muted active:scale-[0.98]">
-          <UserPlus className="size-4" /> Walk-in
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-
-function KpiCard({ kpi }: { kpi: KpiData }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-      <p className="text-sm text-muted-foreground">{kpi.label}</p>
-      <p className="mt-2 text-3xl font-bold">{kpi.value}</p>
-      <div
-        className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${
-          kpi.trendUp ? 'text-emerald-600' : 'text-amber-600'
-        }`}
-      >
-        {kpi.trendUp ? (
-          <TrendingUp className="size-3" />
-        ) : (
-          <TrendingDown className="size-3" />
-        )}
-        {kpi.trend}
-      </div>
-      {kpi.progressPct != null && (
-        <div className="mt-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${kpi.progressPct}%` }}
-            />
-          </div>
-          {kpi.subLabel && (
-            <p className="mt-1 text-xs text-muted-foreground">{kpi.subLabel}</p>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Up Next Card ─────────────────────────────────────────────────────────────
-
-function UpNextCard() {
-  const nextAppt = appointments.find((a) => a.status === 'Registered')
-  const upcoming = appointments.filter((a) => a.status === 'Registered').slice(1, 4)
-
-  return (
-    <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-semibold">Up Next</h3>
-        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-          In 15 min
-        </span>
-      </div>
-
-      {nextAppt && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-fuchsia-100 text-lg font-bold text-fuchsia-700">
-              {getInitials(nextAppt.patient)}
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold">{nextAppt.patient}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {nextAppt.time} · {nextAppt.treatment}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{nextAppt.dentist}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[0.98]">
-              Check In
-            </button>
-            <button className="flex-1 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted active:scale-[0.98]">
-              Reschedule
-            </button>
-            <button className="flex-1 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted active:scale-[0.98]">
-              Message
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 flex-1">
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Then coming up
-        </p>
-        <div className="space-y-1">
-          {upcoming.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition hover:bg-muted"
-            >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                {getInitials(a.patient)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{a.patient}</p>
-                <p className="truncate text-xs text-muted-foreground">{a.treatment}</p>
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {a.time.split(' › ')[0]}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Quick Actions ────────────────────────────────────────────────────────────
-
-function QuickActions() {
-  const actions = [
-    { icon: CalendarDays, label: 'Book Appointment', href: '/reservations', bg: 'bg-primary/10', fg: 'text-primary' },
-    { icon: UserPlus,     label: 'Walk-in Check-in', href: '/patients',     bg: 'bg-emerald-50', fg: 'text-emerald-700' },
-    { icon: DollarSign,   label: 'Take Payment',     href: '/accounts',     bg: 'bg-amber-50',   fg: 'text-amber-700' },
-    { icon: Printer,      label: 'Print Schedule',   href: '/reports',      bg: 'bg-purple-50',  fg: 'text-purple-700' },
-  ]
-  return (
-    <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-4 font-semibold">Quick Actions</h3>
-      <div className="grid flex-1 grid-cols-2 gap-3">
-        {actions.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className="flex flex-col items-center gap-2.5 rounded-xl border border-border p-4 text-center transition hover:border-primary/30 hover:bg-muted active:scale-[0.98]"
-          >
-            <div className={`flex size-10 items-center justify-center rounded-full ${action.bg}`}>
-              <action.icon className={`size-5 ${action.fg}`} />
-            </div>
-            <p className="text-xs font-medium leading-tight">{action.label}</p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Schedule Timeline ────────────────────────────────────────────────────────
-
-function ScheduleTimeline() {
-  const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17]
-
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-semibold">Today&apos;s Schedule</h3>
-        <span className="text-xs text-muted-foreground">9 AM – 5 PM</span>
-      </div>
-      <Link href="/reservations" className="block">
-        <div className="flex overflow-hidden rounded-xl border border-border">
-          {hours.map((h) => {
-            const appts = appointments.filter((a) => Math.floor(a.startHour) === h)
-            const hasInProgress = appts.some((a) => a.status === 'In Progress')
-            const hasWaiting   = appts.some((a) => a.status === 'Waiting payment')
-            const hasRegistered = appts.some((a) => a.status === 'Registered')
-            const hasFinished  = appts.some((a) => a.status === 'Finished')
-            const bg = hasInProgress ? 'bg-purple-200 hover:bg-purple-300'
-              : hasWaiting ? 'bg-amber-200 hover:bg-amber-300'
-              : hasRegistered ? 'bg-blue-200 hover:bg-blue-300'
-              : hasFinished ? 'bg-emerald-200 hover:bg-emerald-300'
-              : 'bg-muted/40 hover:bg-muted'
-            return (
-              <div
-                key={h}
-                className={`flex flex-1 flex-col items-center justify-center border-r border-border/50 py-4 text-[10px] font-medium last:border-0 transition ${bg}`}
-              >
-                <span>{h > 12 ? h - 12 : h}{h >= 12 ? 'pm' : 'am'}</span>
-                {appts.length > 0 && (
-                  <span className="mt-0.5 text-[9px] opacity-70">{appts.length}</span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </Link>
-      <div className="mt-3 flex flex-wrap gap-4">
-        {[
-          ['bg-emerald-200', 'Finished'],
-          ['bg-blue-200', 'Upcoming'],
-          ['bg-amber-200', 'Unpaid'],
-          ['bg-purple-200', 'In Progress'],
-        ].map(([color, label]) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <div className={`size-2.5 rounded-sm ${color}`} />
-            <span className="text-[10px] text-muted-foreground">{label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Dentist Status List ──────────────────────────────────────────────────────
-
-function DentistStatusList() {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-4 font-semibold">Dentist Availability</h3>
-      <div className="space-y-3">
-        {dentists.map((dentist) => (
-          <div
-            key={dentist.id}
-            className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted"
-          >
-            <div className="relative shrink-0">
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted font-bold text-sm">
-                {dentist.initials}
-              </div>
-              <span
-                className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card ${
-                  dentist.statusToday === 'in-session'
-                    ? 'bg-amber-400'
-                    : dentist.statusToday === 'available'
-                    ? 'bg-emerald-400'
-                    : 'bg-neutral-300'
-                }`}
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{dentist.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {dentist.statusToday === 'in-session'
-                  ? 'In Session'
-                  : dentist.statusToday === 'available'
-                  ? 'Available'
-                  : 'Off Today'}
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-              {dentist.appointmentsToday} appts
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Activity Icon ────────────────────────────────────────────────────────────
-
-const ACTIVITY_CONFIG: Record<
-  Activity['type'],
-  { bg: string; text: string; symbol: string }
-> = {
-  'check-in':    { bg: 'bg-emerald-50', text: 'text-emerald-700', symbol: '✓' },
-  'payment':     { bg: 'bg-blue-50',    text: 'text-blue-700',    symbol: '$' },
-  'sms':         { bg: 'bg-purple-50',  text: 'text-purple-700',  symbol: '✉' },
-  'new-patient': { bg: 'bg-pink-50',    text: 'text-pink-700',    symbol: '+' },
-  'appointment': { bg: 'bg-sky-50',     text: 'text-sky-700',     symbol: '📅' },
-  'reschedule':  { bg: 'bg-amber-50',   text: 'text-amber-700',   symbol: '↻' },
-}
-
-// ─── Recent Activity ──────────────────────────────────────────────────────────
-
-function RecentActivity() {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-semibold">Recent Activity</h3>
-        <button className="text-xs text-primary transition hover:underline">View all</button>
-      </div>
-      <div className="space-y-3">
-        {activities.map((act) => {
-          const cfg = ACTIVITY_CONFIG[act.type]
-          return (
-            <div key={act.id} className="flex items-start gap-3">
-              <div
-                className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${cfg.bg} ${cfg.text}`}
-              >
-                {cfg.symbol}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm leading-snug">{act.description}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {formatRelativeTime(act.timestamp)}
-                </p>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── Alerts Panel ─────────────────────────────────────────────────────────────
-
-const PRIORITY_CLASSES: Record<Alert['priority'], string> = {
-  high:   'border-l-rose-400 bg-rose-50/50',
-  medium: 'border-l-amber-400 bg-amber-50/50',
-  low:    'border-l-sky-400 bg-sky-50/50',
-}
-
-function AlertsPanel() {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-semibold">Action Items</h3>
-        <span className="flex size-5 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">
-          {alerts.length}
-        </span>
-      </div>
-      <div className="space-y-3">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className={`flex items-start gap-3 rounded-xl border border-l-4 p-3 ${PRIORITY_CLASSES[alert.priority]}`}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{alert.title}</p>
-              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                {alert.description}
-              </p>
-            </div>
-            <button className="shrink-0 whitespace-nowrap rounded-lg border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-muted active:scale-[0.98]">
-              {alert.actionLabel}
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+const WalkInSheet = dynamic(
+  () =>
+    import('@/components/appointments/WalkInSheet').then(
+      (m) => m.WalkInSheet
+    ),
+  { ssr: false }
+)
 
 export default function DashboardPage() {
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [dentists, setDentists] = useState<DentistResponse[]>([])
+  const [salesSummary, setSalesSummary] = useState<SaleSummary | null>(null)
+  const [requests, setRequests] = useState<PatientRequestResponse[]>([])
+  const [waitingList, setWaitingList] = useState<WaitingPatient[]>([])
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [walkInOpen, setWalkInOpen] = useState(false)
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(null), 3000)
+  }
+
+  const loadDashboardData = async () => {
+    try {
+      const [appts, dents, summary, reqs] = await Promise.all([
+        api.appointments.list({ date: todayStr }),
+        api.dentists.list(),
+        api.sales.summary(),
+        api.patientRequests.list()
+      ])
+
+      const seenIds = new Set<string>()
+      const uniqueAppts = (appts || []).filter((a: any) => {
+        const id = a.id || a.appointment_id
+        if (!id) return true
+        if (seenIds.has(id)) return false
+        seenIds.add(id)
+        return true
+      })
+
+      setAppointments(uniqueAppts)
+
+      if (dents && dents.length > 0) {
+        setDentists(dents)
+      }
+
+      if (summary) {
+        setSalesSummary(summary)
+      }
+
+      if (reqs) {
+        setRequests(reqs)
+      }
+
+      // Populate waiting list from checked-in appointments
+      const checkedIn = uniqueAppts
+        .filter(
+          (a: any) =>
+            normalizeStatus(a.status) === 'checked-in'
+        )
+        .map((a: any, idx: number) => ({
+          id:
+            a.appointment_id ||
+            a.id ||
+            `wait-${idx}`,
+
+          patientId:
+            a.patient_id ||
+            a.patientId ||
+            `PAT-00000${idx + 1}`,
+
+          patientName:
+            a.patient_name ||
+            a.patient ||
+            'Patient',
+
+          avatar:
+            a.patient_avatar ||
+            `https://i.pravatar.cc/150?img=${(idx + 1) * 7}`,
+
+          checkedInAt:
+            new Date(
+              Date.now() -
+                (idx + 1) * 12 * 60000
+            ).toISOString(),
+
+          // FIX:
+          // These names must match the WaitingPatient
+          // properties used below in the JSX.
+          dentistName:
+            a.dentist_name ||
+            a.dentist ||
+            'Assigned Dentist',
+
+          treatment:
+            a.treatment_name ||
+            a.treatment ||
+            'Checkup',
+
+          status: 'waiting' as const,
+        }))
+
+      setWaitingList(checkedIn)
+    } catch (err) {
+      console.error(
+        'Failed to load dashboard data from backend:',
+        err
+      )
+
+      setAppointments([])
+      setWaitingList([])
+    }
+  }
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [todayStr])
+
+  // Up Next Card:
+  // strictly filters checked-in and scheduled appointments
+  const activeOrUpcoming = appointments.filter((a) => {
+    const s = normalizeStatus(a.status)
+
+    return (
+      s === 'checked-in' ||
+      s === 'scheduled'
+    )
+  })
+
+  const nextAppt = activeOrUpcoming[0]
+
+  const completedCount = appointments.filter((a) => {
+    const status = normalizeStatus(a.status)
+
+    return (
+      status === 'completed' ||
+      status === 'paid'
+    )
+  }).length
+
+  const scheduledCount = appointments.filter(
+    (a) =>
+      normalizeStatus(a.status) === 'scheduled'
+  ).length
+
+  const handleCheckIn = async (apptId: string) => {
+    setAppointments((prev) =>
+      prev.map((a) =>
+        a.id === apptId ||
+        a.appointment_id === apptId
+          ? {
+              ...a,
+              status: 'checked-in'
+            }
+          : a
+      )
+    )
+
+    showToast(
+      '✓ Patient checked in and added to queue'
+    )
+
+    try {
+      await api.appointments.updateStatus(
+        apptId,
+        'checked-in'
+      )
+
+      await loadDashboardData()
+    } catch (err) {
+      console.warn(
+        'Could not persist check-in to backend:',
+        err
+      )
+    }
+  }
+
+  const handleCallInWaiting = (
+    waitId: string,
+    patientName: string
+  ) => {
+    setWaitingList((prev) =>
+      prev.filter((w) => w.id !== waitId)
+    )
+
+    showToast(
+      `✓ ${patientName} called into treatment room`
+    )
+  }
+
+  const handleReviewRequest = async (
+    requestId: string,
+    action: 'approve' | 'reject'
+  ) => {
+    try {
+      if (action === 'approve') {
+        await api.patientRequests.approve(requestId)
+        showToast('✓ Request approved and appointment created')
+      } else {
+        await api.patientRequests.reject(requestId)
+        showToast('Request rejected')
+      }
+      await loadDashboardData()
+    } catch (err: any) {
+      showToast(err?.message || 'Could not update request')
+    }
+  }
+
+  const pendingRequests = requests.filter((r) =>
+    String(r.status || '').toLowerCase() === 'pending'
+  )
+
+  const getWaitTimeMinutes = (
+    isoString: string
+  ) => {
+    const diffMs =
+      Date.now() -
+      new Date(isoString).getTime()
+
+    return Math.max(
+      1,
+      Math.floor(diffMs / 60000)
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6 p-6 md:p-8">
-      {/* Row 1: Greeting */}
-      <GreetingHeader />
+    <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1600px] mx-auto w-full">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed top-20 right-8 z-50 rounded-xl bg-foreground text-background px-5 py-3 text-xs font-bold shadow-xl animate-in slide-in-from-top-2">
+          {toastMsg}
+        </div>
+      )}
 
-      {/* Row 2: KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {kpiData.map((kpi) => (
-          <KpiCard key={kpi.label} kpi={kpi} />
-        ))}
+      {/* Greeting Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            Clinic Overview 👋
+          </h2>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            Welcome, <strong>Darrell Steward</strong>{' '}
+            (Receptionist). You have{' '}
+            <strong className="text-foreground">
+              {appointments.length} appointments
+            </strong>{' '}
+            scheduled for today.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setWalkInOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98] shadow-sm cursor-pointer"
+          >
+            <Plus className="size-4" />
+            Walk-In Intake
+          </button>
+
+          <Link
+            href="/reservations"
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground transition hover:opacity-90 active:scale-[0.98] shadow-sm"
+          >
+            <CalendarDays className="size-4" />
+            Calendar View
+          </Link>
+
+          <Link
+            href="/patients"
+            className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold hover:bg-muted active:scale-[0.98] transition"
+          >
+            <Users className="size-4" />
+            Patients Directory
+          </Link>
+        </div>
       </div>
 
-      {/* Row 3: Up Next + Quick Actions */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-        <div className="md:col-span-8">
-          <UpNextCard />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Appointments */}
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Appointments Today
+            </p>
+
+            <CalendarDays className="size-5 text-primary" />
+          </div>
+
+          <p className="mt-3 text-3xl font-black">
+            {appointments.length}
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {completedCount} completed ·{' '}
+            {scheduledCount} remaining
+          </p>
         </div>
-        <div className="md:col-span-4">
-          <QuickActions />
+
+        {/* Waiting Room */}
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Waiting Room
+            </p>
+
+            <Clock className="size-5 text-amber-500" />
+          </div>
+
+          <p className="mt-3 text-3xl font-black">
+            {waitingList.length}
+          </p>
+
+          <p className="mt-1 text-xs text-amber-700 font-medium">
+            Active in receptionist queue
+          </p>
+        </div>
+
+        {/* Revenue */}
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Revenue Collected
+            </p>
+
+            <DollarSign className="size-5 text-emerald-600" />
+          </div>
+
+          <p className="mt-3 text-3xl font-black">
+            $
+            {salesSummary?.total_paid !==
+            undefined
+              ? Number(
+                  salesSummary.total_paid
+                ).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })
+              : '0.00'}
+          </p>
+
+          <p className="mt-1 text-xs text-emerald-600 font-medium">
+            $
+            {salesSummary?.total_pending !==
+            undefined
+              ? Number(
+                  salesSummary.total_pending
+                ).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })
+              : '0.00'}{' '}
+            pending payment
+          </p>
+        </div>
+
+        {/* Practitioners */}
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Practitioners Active
+            </p>
+
+            <Stethoscope className="size-5 text-sky-600" />
+          </div>
+
+          <p className="mt-3 text-3xl font-black">
+            {dentists.length || 3}
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            All rooms staffed
+          </p>
         </div>
       </div>
 
-      {/* Row 4: Schedule Timeline + Dentist Status */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-        <div className="md:col-span-8">
-          <ScheduleTimeline />
+      {/* Quick Actions */}
+      <DashboardQuickActions
+        onAddWaitingPatient={(newPatient) => {
+          setWaitingList((prev) => [
+            newPatient,
+            ...prev
+          ])
+
+          showToast(
+            `✓ ${newPatient.patientName} added to waiting room queue`
+          )
+        }}
+      />
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Columns */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Up Next */}
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between border-b border-border/70 pb-4">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                  Reception Priority
+                </span>
+
+                <h3 className="text-lg font-bold text-foreground">
+                  Up Next Patient
+                </h3>
+              </div>
+
+              {nextAppt && (
+                <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-bold">
+                  {nextAppt.time ||
+                    `${nextAppt.start_time} - ${nextAppt.end_time}`}
+                </span>
+              )}
+            </div>
+
+            {nextAppt ? (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <PatientAvatar
+                    name={
+                      nextAppt.patient ||
+                      nextAppt.patient_name
+                    }
+                    size="lg"
+                  />
+
+                  <div>
+                    <h4 className="text-lg font-bold text-foreground">
+                      {nextAppt.patient ||
+                        nextAppt.patient_name}
+                    </h4>
+
+                    <p className="text-xs text-muted-foreground">
+                      {nextAppt.treatment ||
+                        nextAppt.treatment_name}{' '}
+                      · With{' '}
+                      {nextAppt.dentist ||
+                        nextAppt.dentist_name}
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="rounded-full bg-sky-50 text-sky-700 px-2.5 py-0.5 text-[11px] font-semibold border border-sky-200">
+                        ●{' '}
+                        {normalizeStatus(
+                          nextAppt.status
+                        ).toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  {normalizeStatus(
+                    nextAppt.status
+                  ) === 'checked-in' ? (
+                    <>
+                      <button
+                        onClick={() =>
+                          showToast(
+                            `🔔 Attending dentist notified for ${
+                              nextAppt.patient ||
+                              nextAppt.patient_name
+                            }`
+                          )
+                        }
+                        className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 active:scale-[0.98] transition shadow-sm"
+                      >
+                        <Bell className="size-4" />
+                        Notify Dentist
+                      </button>
+
+                      <Link
+                        href="/reservations"
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-muted transition"
+                      >
+                        View Details
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() =>
+                          handleCheckIn(
+                            nextAppt.id ||
+                              nextAppt.appointment_id
+                          )
+                        }
+                        className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 active:scale-[0.98] transition shadow-sm"
+                      >
+                        <UserCheck className="size-4" />
+                        Check In Patient
+                      </button>
+
+                      <Link
+                        href="/reservations"
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-muted transition"
+                      >
+                        Reschedule
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No upcoming appointments pending check-in.
+              </div>
+            )}
+          </div>
+
+          {/* Waiting Room */}
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">
+                  Waiting Room Queue
+                </h3>
+
+                <p className="text-xs text-muted-foreground">
+                  Patients currently waiting in the clinic lobby
+                </p>
+              </div>
+
+              <span className="text-xs font-bold text-muted-foreground">
+                {waitingList.length} in lobby
+              </span>
+            </div>
+
+            {waitingList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                Lobby is currently clear. Use
+                &quot;Walk-In Intake&quot; above to register
+                new arrivals.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {waitingList.map((wait, idx) => {
+                  const minutes =
+                    getWaitTimeMinutes(
+                      wait.checkedInAt
+                    )
+
+                  const isAmber =
+                    minutes >= 10 &&
+                    minutes < 20
+
+                  const isRed =
+                    minutes >= 20
+
+                  return (
+                    <div
+                      key={`wait-${wait.id}-${idx}`}
+                      className="flex items-center justify-between rounded-xl border border-border p-3.5 bg-background transition hover:bg-muted/30"
+                    >
+                      <div className="flex items-center gap-3">
+                        <PatientAvatar
+                          name={wait.patientName}
+                          size="md"
+                        />
+
+                        <div>
+                          <p className="font-bold text-xs text-foreground">
+                            {wait.patientName}
+                          </p>
+
+                          <p className="text-[11px] text-muted-foreground">
+                            {wait.treatment} ·{' '}
+                            {wait.dentistName}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`rounded-lg px-2.5 py-1 text-xs font-bold flex items-center gap-1 border ${
+                            isRed
+                              ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
+                              : isAmber
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : 'bg-muted text-muted-foreground border-border'
+                          }`}
+                        >
+                          <Clock className="size-3" />
+                          {minutes} min wait
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            handleCallInWaiting(
+                              wait.id,
+                              wait.patientName
+                            )
+                          }
+                          className="rounded-xl border border-primary text-primary px-3 py-1.5 text-xs font-bold hover:bg-primary/10 transition active:scale-[0.98]"
+                        >
+                          Call In
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Patient Requests</h3>
+                <p className="text-xs text-muted-foreground">Pending booking requests awaiting approval</p>
+              </div>
+              <span className="text-xs font-bold text-muted-foreground">
+                {pendingRequests.length} pending
+              </span>
+            </div>
+            {pendingRequests.length === 0 ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">
+                No pending patient requests.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingRequests.slice(0, 6).map((req, idx) => (
+                  <div
+                    key={`req-${req.request_id || 'req'}-${idx}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3.5"
+                  >
+                    <div>
+                      <p className="font-bold text-xs text-foreground">{req.patient_name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {req.preferred_date || 'No date'} · {req.preferred_start_time || '—'}
+                        {req.reason ? ` · ${req.reason}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleReviewRequest(req.request_id, 'approve')}
+                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700"
+                      >
+                        <Check className="size-3.5" /> Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReviewRequest(req.request_id, 'reject')}
+                        className="flex items-center gap-1 rounded-lg border border-rose-300 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-50"
+                      >
+                        <X className="size-3.5" /> Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="md:col-span-4">
-          <DentistStatusList />
+
+        {/* Right Column */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-border/70 pb-3">
+            <h3 className="text-base font-bold text-foreground">
+              Today&apos;s Schedule
+            </h3>
+
+            <Link
+              href="/reservations"
+              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+            >
+              All
+              <ChevronRight className="size-3.5" />
+            </Link>
+          </div>
+
+          <div className="space-y-3.5 max-h-[600px] overflow-auto pr-1">
+            {appointments.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No appointments scheduled for today.
+              </div>
+            ) : (
+              appointments
+                .slice(0, 8)
+                .map((appt, idx) => {
+                  const status =
+                    normalizeStatus(
+                      appt.status
+                    )
+
+                  const statusMeta =
+                    getStatusMeta(status)
+
+                  const patientName =
+                    appt.patient ||
+                    appt.patient_name ||
+                    'Patient'
+
+                  return (
+                    <div
+                      key={`sched-${
+                        appt.id ||
+                        appt.appointment_id ||
+                        'apt'
+                      }-${idx}`}
+                      className="rounded-xl border border-border/80 p-3 bg-muted/20 space-y-1 text-xs transition hover:bg-muted/40"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-foreground">
+                          {patientName}
+                        </span>
+
+                        <span
+                          className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${statusMeta.badgeClass} ${statusMeta.borderClass}`}
+                        >
+                          {statusMeta.label}
+                        </span>
+                      </div>
+
+                      <p className="text-muted-foreground text-[11px]">
+                        {appt.treatment ||
+                          appt.treatment_name}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t border-border/50">
+                        <span>
+                          {appt.time ||
+                            `${appt.start_time} - ${appt.end_time}`}
+                        </span>
+
+                        <span className="font-medium">
+                          {appt.dentist ||
+                            appt.dentist_name}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Row 5: Activity + Alerts */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <RecentActivity />
-        <AlertsPanel />
-      </div>
+      {/* Walk-In Intake Sheet */}
+      {walkInOpen && (
+        <WalkInSheet
+          onClose={() => setWalkInOpen(false)}
+          onComplete={(newPatient) => {
+            setWaitingList((prev) => [
+              newPatient,
+              ...prev
+            ])
+
+            showToast(
+              `✓ Walk-in patient ${newPatient.patientName} added to waiting queue`
+            )
+          }}
+        />
+      )}
     </div>
   )
 }

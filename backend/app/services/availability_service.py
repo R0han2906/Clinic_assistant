@@ -130,10 +130,12 @@ class AvailabilityService:
             existing_apts = get_existing_apts(d.dentist_id)
             busy_ranges = []
             for apt in existing_apts:
-                if apt.status in [
-                    AppointmentStatus.CONFIRMED,
-                    AppointmentStatus.PENDING,
-                    AppointmentStatus.RESCHEDULED
+                apt_stat = apt.status.value if hasattr(apt.status, "value") else str(apt.status)
+                if apt_stat.lower() not in [
+                    AppointmentStatus.CANCELLED.value,
+                    AppointmentStatus.NO_SHOW.value,
+                    "cancelled",
+                    "no-show"
                 ]:
                     try:
                         apt_start = datetime.combine(

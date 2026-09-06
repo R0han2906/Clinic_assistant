@@ -32,7 +32,9 @@ def reset_demo_data():
 
     # Re-initialize clean repository
     repo = ExcelClinicRepository()
-    print("[✓] Clinic workbook successfully reset to pristine baseline.")
+    # Populate demo patients and appointments for frontend testing
+    repo.seed_demo_data()
+    print("[✓] Clinic workbook successfully reset and seeded with demo baseline.")
 
 if __name__ == "__main__":
     reset_demo_data()

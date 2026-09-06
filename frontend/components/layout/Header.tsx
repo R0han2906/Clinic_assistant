@@ -99,7 +99,7 @@ export function Header() {
           </div>
           <div>
             <p className="text-sm font-semibold">Darrell Steward</p>
-            <p className="text-xs text-muted-foreground">Super admin</p>
+            <p className="text-xs font-medium text-primary">Receptionist</p>
           </div>
           <ChevronDown className="size-4 text-muted-foreground" />
         </div>

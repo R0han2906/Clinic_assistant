@@ -23,7 +23,7 @@ export const useSidebarStore = create<SidebarState>()(
       closeMobile: () => set({ isMobileOpen: false }),
     }),
     {
-      name: 'zendenta-sidebar',
+      name: 'clinix-sidebar',
       partialize: (state) => ({ isCollapsed: state.isCollapsed }),
     }
   )

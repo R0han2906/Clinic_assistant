@@ -1,408 +1,206 @@
-# Zendenta Frontend — Work Progress & Context
+# Zendenta Frontend — Architecture, Context & Component Guide
 
-> **Project:** Zendenta — Dental Clinic Management SaaS  
-> **Target User:** Clinic receptionists (appointment booking, check-ins, billing, daily schedule)  
-> **Status:** UI Prototype complete · No real backend (all data is mock)  
+> **Project:** Zendenta — Receptionist-First Dental Clinic Management System  
+> **Target User:** Clinic receptionists (scheduling, check-ins, queue management, billing)  
+> **Architecture:** Next.js 16 App Router (Turbopack) + Tailwind CSS v4 + TypeScript  
+> **Status:** Zendenta v3 Receptionist-First Upgrade Complete  
 > **Last Updated:** September 2026
 
 ---
 
-## Table of Contents
-1. [Project Overview](#1-project-overview)
-2. [Tech Stack](#2-tech-stack)
-3. [Project Structure](#3-project-structure)
-4. [Pages & Routes](#4-pages--routes)
-5. [Architecture & Key Decisions](#5-architecture--key-decisions)
-6. [Data Layer (Mock)](#6-data-layer-mock)
-7. [State Management (Zustand)](#7-state-management-zustand)
-8. [Layout System](#8-layout-system)
-9. [Design System & Styling](#9-design-system--styling)
-10. [Keyboard Shortcuts](#10-keyboard-shortcuts)
-11. [Running Locally](#11-running-locally)
-12. [What's Next / TODO](#12-whats-next--todo)
+## 1. Executive Summary & Zendenta v3 Upgrade
+
+Zendenta v3 aligns the clinic management dashboard with the **Clinic Receptionist** persona. The receptionist is the front-desk orchestrator responsible for intake, scheduling, queue monitoring, and billing. Clinical examinations and medical checkup modifications are separated from the receptionist's permissions.
+
+### Core Upgrades in Zendenta v3:
+1. **Next.js 16 Server vs. Client Component Discipline**:
+   - `app/reservations/page.tsx` and `app/patients/page.tsx` are static **Server Components** rendering interactive Client Component shells (`CalendarBoard.tsx` and `PatientsDirectory.tsx`).
+   - Extracted `PatientRow.tsx` and `PatientAvatar.tsx` as Client Components to prevent Server Component `<img onError>` runtime errors.
+2. **7-State Appointment Lifecycle Engine** (`lib/appointment-lifecycle.ts`):
+   - Strict state transitions: `scheduled` → `checked-in` → `in-progress` → `completed` → `paid` (plus `cancelled` & `no-show` rebook paths).
+   - Receptionist actions mapped directly to appointment status.
+3. **Receptionist Role Permissions**:
+   - Replaced dentist-only *"Edit Medical Checkup"* with read-only *"View Visit Summary"* (`VisitSummaryPanel.tsx`), *"Receptionist Admin Notes"*, and *"View Medical Records"*.
+   - User profile badge in header identifies user as `Darrell Steward · Receptionist`.
+   - Reports partitioned into accessible Operational Reports and restricted `[Admin Only]` Financial Reports.
+4. **Interactive Dialogs (`next/dynamic` with `{ ssr: false }`)**:
+   - **Take Payment Dialog** (`TakePaymentDialog.tsx`): 480px modal for recording payments and transitioning status to `paid`.
+   - **Visit Summary Panel** (`VisitSummaryPanel.tsx`): Read-only chief complaint, diagnosis, prescriptions, and billing.
+   - **Reschedule Dialog** (`RescheduleDialog.tsx`): Slot chips and date picker.
+   - **Cancel Dialog** (`CancelDialog.tsx`): Cancellation reasons and rebook triggers.
+   - **Walk-In Intake Drawer** (`WalkInSheet.tsx`): 4-step intake drawer feeding into lobby queue.
+5. **Dashboard Enhancements**:
+   - Status-aware Up Next card (displays *"Notify Dentist"* once checked in).
+   - Waiting Room lobby queue with color-coded wait durations (amber at ≥ 10 min, red at ≥ 20 min).
+   - Greeting header `+ Walk-In Intake` button and Quick Actions tiles.
+6. **Zero-Mock Real Data Policy**:
+   - 100% elimination of mock datasets across all routes (`reservations`, `dashboard`, `patients`, `staff`, `sales`, `stocks`, `purchases`, `accounts`, `payment-methods`, `treatments`).
+   - Components initialize to empty arrays and render live backend data (`PAT-XXXXXX`, `APT-XXXXXX`, `DOC-XXXXXX`) or responsive empty states.
+7. **Interactive Drag-and-Drop Rescheduling**:
+   - Built-in HTML5 drag-and-drop on `CalendarBoard.tsx`.
+   - Cards are draggable with duration preservation; dentist hour slots serve as drop targets with highlighted dropzones (`bg-primary/20 border-dashed`).
+   - Persists automatically via `POST /api/v1/appointments/{id}/reschedule` with optimistic updates and conflict rollback.
 
 ---
 
-## 1. Project Overview
+## 2. Tech Stack & Standards
 
-Zendenta is a **multi-page dental clinic management dashboard** built as a high-fidelity UI prototype. It covers:
-
-- 📅 **Reservations** — Interactive daily calendar view with 3 dentist columns, appointment drawer, and a multi-step Medical Checkup wizard
-- 🏠 **Dashboard** — Real-time KPIs, "Up Next" queue, schedule timeline, dentist status, activity feed, and action items
-- 👥 **Patients** — Searchable patient list and individual patient detail pages
-- 🦷 **Treatments** — Service catalog with pricing and duration
-- 👔 **Staff** — Team member directory
-- 💰 **Finance** — Accounts, Sales, Purchases, Payment Methods
-- 📦 **Assets** — Stocks (inventory), Peripherals (equipment)
-- 📊 **Reports** — Report category navigator
-- 🎧 **Support** — Ticket submission + contact channels
-
-All interactions, routing, and UI states are **fully functional** — there is no real backend, but every page renders real mock data and all modals/drawers/wizards work end-to-end.
+| Layer | Technology | Version | Purpose |
+|---|---|---|---|
+| Framework | Next.js (App Router) | 16.3.3 | Hybrid Server/Client rendering, Turbopack dev server |
+| Language | TypeScript | 5.7.3 | Strict end-to-end typing |
+| Styling | Tailwind CSS v4 | ^4.3.3 | Modern CSS-first engine using `oklch()` design tokens |
+| Component Base | shadcn/ui (`@base-ui/react`) | ^4.11.0 | Accessible primitive components |
+| Icons | Lucide React | ^1.16.0 | Semantic iconography across all modules |
+| State | Zustand | ^5.0.15 | UI sidebar and layout state |
+| Animation | Framer Motion | ^13.2.0 | Layout transitions and modal backdrops |
+| Package Manager | pnpm | ^9.0.0 | Fast, deterministic package management |
 
 ---
 
-## 2. Tech Stack
+## 3. Project Directory Structure
 
-| Layer | Technology | Version |
-|---|---|---|
-| Framework | Next.js (App Router) | 16.3.3 |
-| Language | TypeScript | 5.7.3 |
-| Styling | Tailwind CSS v4 | ^4.3.3 |
-| Component base | shadcn/ui (base-nova style via `@base-ui/react`) | ^4.11.0 |
-| Icons | lucide-react | ^1.16.0 |
-| State | Zustand | ^5.0.15 |
-| Animation | Framer Motion | ^13.2.0 |
-| Date utilities | date-fns | ^4.4.0 |
-| Analytics | @vercel/analytics | 1.6.1 |
-| Package manager | pnpm (workspace) | — |
-
-> **Important:** Tailwind v4 does NOT use `tailwind.config.ts`. All tokens/colors are defined in `app/globals.css` using CSS custom properties with `oklch()` color space.
-
----
-
-## 3. Project Structure
-
-```
+```text
 frontend/
-├── app/                          # Next.js App Router pages
-│   ├── layout.tsx                # Root layout — wraps ALL pages in <LayoutShell>
-│   ├── page.tsx                  # Redirects / → /dashboard
-│   ├── loading.tsx               # Root loading skeleton
-│   ├── globals.css               # Design tokens (CSS variables, oklch colors)
+├── app/
+│   ├── layout.tsx                    # Root layout wrapping all pages in <LayoutShell>
+│   ├── page.tsx                      # Server redirect: / → /dashboard
+│   ├── loading.tsx                   # Global root loading skeleton
+│   ├── globals.css                   # Tailwind v4 tokens & color variables
 │   ├── dashboard/
-│   │   ├── page.tsx              # Dashboard home (Server Component)
-│   │   └── loading.tsx           # Dashboard skeleton
+│   │   └── page.tsx                  # Dashboard with Up Next, Waiting Room, KPIs, Walk-In trigger
 │   ├── reservations/
-│   │   ├── page.tsx              # Calendar + drawer + wizard (Client Component)
-│   │   └── loading.tsx           # Calendar skeleton
+│   │   ├── page.tsx                  # Server Component shell for calendar
+│   │   └── loading.tsx               # Calendar loading skeleton
 │   ├── patients/
-│   │   ├── page.tsx              # Patient list (Server Component)
-│   │   ├── loading.tsx           # Patient list skeleton
-│   │   └── [id]/
-│   │       └── page.tsx          # Patient detail (Server Component + generateStaticParams)
-│   ├── treatments/page.tsx       # Treatment catalog (Server Component)
-│   ├── staff/page.tsx            # Staff directory (Server Component)
-│   ├── accounts/page.tsx         # Financial accounts (Server Component)
-│   ├── sales/page.tsx            # Sales + revenue chart (Server Component)
-│   ├── purchases/page.tsx        # Purchase orders (Server Component)
-│   ├── payment-methods/page.tsx  # Payment method toggles (Server Component)
-│   ├── stocks/page.tsx           # Inventory + low stock alerts (Server Component)
-│   ├── peripherals/page.tsx      # Equipment asset cards (Server Component)
-│   ├── reports/page.tsx          # Report navigator (Server Component)
-│   └── support/page.tsx          # Support contacts + ticket form (Server Component)
+│   │   ├── page.tsx                  # Server Component shell for patient directory
+│   │   ├── loading.tsx               # Patients list loading skeleton
+│   │   └── [id]/page.tsx             # Patient profile & visit history
+│   ├── treatments/
+│   │   ├── page.tsx                  # 3-column procedure catalog with category border-tops
+│   │   └── loading.tsx               # Treatments loading skeleton
+│   ├── staff/
+│   │   ├── page.tsx                  # Staff directory & status badges
+│   │   └── loading.tsx               # Staff loading skeleton
+│   ├── reports/page.tsx              # Role-partitioned operational vs restricted financial reports
+│   ├── sales/page.tsx                # Billing records & revenue breakdown
+│   ├── purchases/page.tsx            # Supply orders & vendor management
+│   ├── stocks/page.tsx               # Inventory tracking & low-stock alerts
+│   ├── payment-methods/page.tsx      # Payment methods configuration
+│   ├── accounts/page.tsx             # Financial accounts overview
+│   ├── peripherals/page.tsx          # Physical clinic hardware assets
+│   └── support/page.tsx              # Clinic support contacts & tickets
 │
 ├── components/
+│   ├── appointments/
+│   │   ├── CancelDialog.tsx          # Modal for cancelling appointments with reasons
+│   │   ├── RescheduleDialog.tsx      # Modal for rebooking time slots
+│   │   ├── ReservationDrawer.tsx     # Status-driven appointment detail drawer
+│   │   ├── VisitSummaryPanel.tsx     # Read-only post-appointment clinical report
+│   │   └── WalkInSheet.tsx           # 4-step walk-in intake drawer
+│   ├── dashboard/
+│   │   └── DashboardQuickActions.tsx # Quick actions tiles (Intake, Appointment, Pay, Reports)
 │   ├── layout/
-│   │   ├── LayoutShell.tsx       # Client wrapper: Sidebar + Header + children
-│   │   ├── Sidebar.tsx           # Collapsible sidebar, active-route highlighting,
-│   │   │                         # mobile drawer, clinic card
-│   │   └── Header.tsx            # Dynamic page title, search, user profile,
-│   │                             # keyboard shortcut listeners
-│   ├── ui/
-│   │   └── button.tsx            # shadcn Button (uses @base-ui/react)
-│   └── reservations-app.tsx      # [LEGACY] Original monolithic v1 prototype —
-│                                 #   kept for reference, no longer rendered
+│   │   ├── Header.tsx                # Dynamic header with Receptionist user badge & search
+│   │   ├── LayoutShell.tsx           # Collapsible sidebar & responsive layout shell
+│   │   └── Sidebar.tsx               # Navigation with section headings & active highlighting
+│   ├── patients/
+│   │   ├── PatientAvatar.tsx         # Client avatar with safe onError initials fallback
+│   │   ├── PatientRow.tsx            # Client patient row component
+│   │   └── PatientsDirectory.tsx     # Client patient directory with search & filters
+│   ├── payments/
+│   │   └── TakePaymentDialog.tsx     # 480px payment intake modal
+│   └── reservations/
+│       └── CalendarBoard.tsx         # Client calendar board & deduplicated hourly grid
 │
 ├── lib/
-│   ├── mock-data.ts              # ALL mock data (see §6)
-│   ├── constants.ts              # Nav config, color maps, keyboard shortcuts
-│   ├── formatters.ts             # Utility formatters (currency, date, time, age…)
-│   └── utils.ts                  # cn() utility (clsx + tailwind-merge)
-│
-├── store/
-│   ├── sidebar.store.ts          # Zustand: sidebar collapse + mobile open state
-│   └── modal.store.ts            # Zustand: Medical Checkup wizard step state
-│
-├── types/
-│   └── index.ts                  # All TypeScript interfaces and type aliases
-│
-├── public/                       # Static assets (icons, images)
-├── components.json               # shadcn config (base-nova style, @base-ui/react)
-├── next.config.mjs               # Next.js config
-├── tsconfig.json                 # TypeScript config (paths: @/ → ./*)
-└── package.json                  # Dependencies
+│   ├── api-client.ts                 # Type-safe API client with graceful offline fallbacks
+│   ├── appointment-lifecycle.ts      # 7-state machine, allowed transitions & action mapper
+│   ├── constants.ts                  # Navigation configs & keyboard shortcuts
+│   ├── formatters.ts                 # Currency and duration formatters
+│   ├── mock-data.ts                  # Authoritative dataset for offline reliability
+│   └── utils.ts                      # ClassName merger (clsx + tailwind-merge)
+└── types/
+    ├── api.ts                        # Backend DTOs & response schemas
+    └── index.ts                      # Internal domain interfaces
 ```
 
 ---
 
-## 4. Pages & Routes
+## 4. Server vs. Client Component Boundaries
 
-| Route | File | Render | Description |
+Next.js 16 strictly forbids DOM event handlers (`onClick`, `onError`, `onChange`) in Server Components. Zendenta uses a **Server Component Data Provider + Client Component Interactive Shell** architecture:
+
+```
+[app/reservations/page.tsx (Server Component)]
+    │
+    └── <CalendarBoard (Client Component 'use client')>
+            ├── <ReservationDrawer (dynamic)>
+            ├── <VisitSummaryPanel (dynamic)>
+            ├── <TakePaymentDialog (dynamic)>
+            ├── <RescheduleDialog (dynamic)>
+            └── <CancelDialog (dynamic)>
+
+[app/patients/page.tsx (Server Component)]
+    │
+    └── <PatientsDirectory (Client Component 'use client')>
+            └── <PatientRow (Client Component 'use client')>
+                    └── <PatientAvatar (Client Component 'use client')>
+```
+
+### Key Architectural Invariants:
+1. **Zero Event Handlers in Server Components**: Every component with an interactive event handler or state hook contains `'use client'` at the very top.
+2. **Lazy Dialog Loading**: Heavy modals are imported via `dynamic(() => import(...), { ssr: false })` to optimize First Contentful Paint (FCP) and Lighthouse performance.
+3. **Guaranteed Unique Keys**: All mapped appointment elements in the calendar grid enforce composite unique keys: `cal-${docId}-${appt.id || appt.appointment_id || 'apt'}-${idx}`.
+
+---
+
+## 5. Appointment Lifecycle State Machine
+
+Defined in `lib/appointment-lifecycle.ts`:
+
+### 7 Canonical States
+1. `scheduled` — Booked for future slot.
+2. `checked-in` — Patient has arrived in the clinic lobby.
+3. `in-progress` — Patient is currently in the dental operatory with the dentist.
+4. `completed` — Dental procedure finished; visit summary recorded; awaiting payment.
+5. `paid` — Bill settled in full; receipt issued.
+6. `cancelled` — Appointment cancelled prior to procedure.
+7. `no-show` — Patient failed to arrive for scheduled time.
+
+### Valid Receptionist Actions per Status
+- **`scheduled`**: Check In, Reschedule, Cancel, Call Patient, Send Reminder SMS.
+- **`checked-in`**: Notify Dentist, Mark No-Show, Cancel.
+- **`in-progress`**: View Only (disabled during procedure).
+- **`completed`**: Take Payment, View Visit Summary, Book Follow-up, Print Receipt.
+- **`paid`**: Send Thank-You, Book Follow-up, View Summary.
+- **`cancelled`**: Rebook, Contact Patient.
+- **`no-show`**: Follow-Up Call, Rebook, Flag Patient for Attendance Policy.
+
+---
+
+## 6. Offline-First & API Resilience
+
+The frontend communicates with the FastAPI backend at `http://localhost:8000`. Every API call in `lib/api-client.ts` is wrapped in safe error-catching handlers. If the backend server is temporarily offline:
+- The UI seamlessly falls back to the curated mock dataset in `lib/mock-data.ts`.
+- The terminal remains clean without unhandled network exception dumps.
+- Receptionists can continue testing workflows (taking payments, rescheduling, walk-in intakes) with optimistic local state updates.
+
+---
+
+## 7. Full-Stack Backend API Wiring
+
+Zendenta v3 features end-to-end integration between frontend actions and backend REST endpoints:
+
+| Frontend User Action | Component | Backend Endpoint | Request Payload |
 |---|---|---|---|
-| `/` | `app/page.tsx` | Server | Instant redirect to `/dashboard` |
-| `/dashboard` | `app/dashboard/page.tsx` | Server (static) | KPIs, Up Next queue, schedule timeline, alerts |
-| `/reservations` | `app/reservations/page.tsx` | **Client** | Daily calendar, appointment drawer, medical wizard |
-| `/patients` | `app/patients/page.tsx` | Server (static) | Searchable/filterable patient table (24 patients) |
-| `/patients/[id]` | `app/patients/[id]/page.tsx` | Server (static) | Patient detail, contact info, appointment history |
-| `/treatments` | `app/treatments/page.tsx` | Server (static) | Treatment cards with category, price, duration |
-| `/staff` | `app/staff/page.tsx` | Server (static) | Staff member cards with role and contact |
-| `/accounts` | `app/accounts/page.tsx` | Server (static) | Financial account cards + total balance |
-| `/sales` | `app/sales/page.tsx` | Server (static) | Revenue KPIs, CSS bar chart, sales table |
-| `/purchases` | `app/purchases/page.tsx` | Server (static) | Purchase orders table with status |
-| `/payment-methods` | `app/payment-methods/page.tsx` | Server (static) | Method cards with toggle UI |
-| `/stocks` | `app/stocks/page.tsx` | Server (static) | Inventory table with low-stock warning banner |
-| `/peripherals` | `app/peripherals/page.tsx` | Server (static) | Equipment asset cards |
-| `/reports` | `app/reports/page.tsx` | Server (static) | Report category cards + export buttons |
-| `/support` | `app/support/page.tsx` | Server (static) | Contact channels + ticket form |
+| Status transition (Check In, Start, Complete, Cancel) | `CalendarBoard.tsx`, `ReservationDrawer.tsx` | `PATCH /api/v1/appointments/{id}/status` | `{ "status": "checked-in", "notes": "..." }` |
+| View clinical summary | `VisitSummaryPanel.tsx` | `GET /api/v1/appointments/{id}/visit-summary` | (None) |
+| Save clinical summary | `VisitSummaryPanel.tsx` | `POST /api/v1/appointments/{id}/visit-summary` | `{ "diagnosis": "...", "prescriptions": [...] }` |
+| Take payment | `TakePaymentDialog.tsx` | `PATCH /api/v1/appointments/{id}/payment` | `{ "payment_status": "PAID", "bill_number": "..." }` |
+| Walk-in intake | `WalkInSheet.tsx` | `POST /api/v1/patients`<br>`POST /api/v1/appointments` | Patient data + `{ "source": "WALK_IN", "status": "checked-in" }` |
+| Reschedule appointment | `RescheduleDialog.tsx` | `POST /api/v1/appointments/{id}/reschedule` | `{ "new_date": "...", "new_start_time": "..." }` |
+| Cancel appointment | `CancelDialog.tsx` | `POST /api/v1/appointments/{id}/cancel` | `{ "reason": "Patient requested" }` |
+| Patient Directory search | `PatientsDirectory.tsx` | `GET /api/v1/patients?query=...` | (Query param) |
+| On-demand CSV export | `PatientsDirectory.tsx` | `GET /api/v1/export/patients.csv` | Direct download stream |
 
-> All server pages use `export const dynamic = 'force-static'` for instant load times.
-
----
-
-## 5. Architecture & Key Decisions
-
-### Server Components First
-Every page except `/reservations` is a React Server Component. Only components with interactivity (`'use client'` directive) are:
-- `LayoutShell.tsx` — reads zustand stores, renders `<Sidebar>` + `<Header>`
-- `Sidebar.tsx` — uses `usePathname()` and `useSidebarStore()`
-- `Header.tsx` — uses `usePathname()`, keyboard event listeners
-- `app/reservations/page.tsx` — calendar drag interactions, modal states
-
-### Persistent Layout Shell
-The root `app/layout.tsx` wraps `{children}` in `<LayoutShell>`. This means:
-- The sidebar and header **never unmount** between navigations (instant navigation feel)
-- The active sidebar link automatically highlights based on `usePathname()`
-
-### Static Params for Dynamic Routes
-`/patients/[id]` uses `generateStaticParams()` to pre-render all 24 patient detail pages at build time.
-
-### No Real Backend
-All data is imported directly from `lib/mock-data.ts`. When connecting a real API:
-1. Replace imports from `lib/mock-data.ts` with `fetch()` calls in Server Components
-2. Add `cache: 'no-store'` or `revalidate` as needed per page
-3. Zustand stores only hold UI state — no data fetching logic to migrate
-
----
-
-## 6. Data Layer (Mock)
-
-Everything lives in [`lib/mock-data.ts`](./lib/mock-data.ts):
-
-| Export | Type | Count |
-|---|---|---|
-| `appointments` | `Appointment[]` | 16 today (across 3 dentists) |
-| `dentists` | `Dentist[]` | 3 |
-| `patients` | `Patient[]` | 24 |
-| `treatments` | `Treatment[]` | 15 |
-| `staff` | `StaffMember[]` | 10 |
-| `activities` | `Activity[]` | 12 (with relative timestamps) |
-| `alerts` | `Alert[]` | 6 action items |
-| `inventory` | `InventoryItem[]` | 20 (some below min-stock) |
-| `paymentMethods` | `PaymentMethod[]` | 8 |
-| `salesRecords` | `SaleRecord[]` | 15 |
-| `purchaseOrders` | `PurchaseOrder[]` | 8 |
-| `kpiData` | `KpiData[]` | 4 dashboard KPIs |
-| `currentUser` | `object` | Darrell Steward / Super admin |
-
-All types are in [`types/index.ts`](./types/index.ts).
-
----
-
-## 7. State Management (Zustand)
-
-### `store/sidebar.store.ts` — `useSidebarStore`
-```ts
-{
-  isCollapsed: boolean       // persisted to localStorage as 'zendenta-sidebar'
-  isMobileOpen: boolean      // mobile drawer state (not persisted)
-  toggle()                   // flip isCollapsed
-  setCollapsed(v: boolean)
-  openMobile()
-  closeMobile()
-}
-```
-
-### `store/modal.store.ts` — `useModalStore`
-```ts
-{
-  isOpen: boolean
-  step: 0 | 1 | 2 | 3      // Medical Checkup wizard step
-  appointmentId: string | null
-  open(appointmentId?)
-  close()
-  setStep(step)
-  nextStep()
-  prevStep()
-}
-```
-
----
-
-## 8. Layout System
-
-### Shell Layout
-
-```
-┌─ body ──────────────────────────────────────────────────────────────────┐
-│  ┌─ LayoutShell (flex h-screen overflow-hidden) ────────────────────────┤
-│  │  ┌─ Sidebar ──┐  ┌─ <main> (flex-1 flex-col min-w-0) ─────────────┐ │
-│  │  │ 76px–236px │  │  ┌─ Header (h-[82px]) ──────────────────────┐  │ │
-│  │  │ collapsible│  │  └──────────────────────────────────────────┘  │ │
-│  │  │            │  │  ┌─ Page Content (flex-1 overflow-auto) ──────┐ │ │
-│  │  │            │  │  │   {children}                               │ │ │
-│  │  │            │  │  └────────────────────────────────────────────┘ │ │
-│  │  └────────────┘  └───────────────────────────────────────────────── │ │
-```
-
-### Sidebar width states
-- **Expanded:** `w-[236px]` — shows logo text, nav labels, clinic card, badge counts
-- **Collapsed:** `w-[76px]` — shows only icons, tooltip titles on hover
-- **Mobile:** Off-canvas drawer overlay (`fixed inset-0 z-30`)
-
-### Header dynamic title
-The `Header` reads `usePathname()`, matches against `navConfig` in `lib/constants.ts`, and renders the active page label as `<h1>`.
-
----
-
-## 9. Design System & Styling
-
-### Color System (`app/globals.css`)
-Tailwind v4 uses `@theme inline {}` with `oklch()` colors — **no `tailwind.config.ts`**.
-
-Key CSS variables (light mode):
-```css
---primary: oklch(...)          /* Primary brand color (blue-ish purple) */
---background: oklch(...)       /* Page background (near-white) */
---card: oklch(...)             /* Card surface */
---muted: oklch(...)            /* Secondary surfaces */
---muted-foreground: oklch(...) /* Subdued text */
---border: oklch(...)           /* Subtle borders */
---radius: 0.5rem               /* Base border radius */
-```
-
-### shadcn Configuration (`components.json`)
-```json
-{
-  "style": "base-nova",
-  "baseColor": "neutral",
-  "ui": "@base-ui/react"        ← uses Base UI, NOT Radix UI
-}
-```
-
-> **⚠️ Important for contributors:** shadcn components here use `@base-ui/react` primitives, not the more common `@radix-ui/react-*`. When adding new shadcn components, always verify the import source.
-
-### Color Utility Maps (`lib/constants.ts`)
-These maps are used throughout for consistent badge/card coloring:
-- `APPOINTMENT_COLOR_CLASSES` — 5 appointment colors (rose, sage, sky, amber, purple)
-- `STATUS_BADGE_CLASSES` — Appointment status badge colors
-- `PATIENT_STATUS_CLASSES` — Patient status badge colors
-- `STAFF_STATUS_CLASSES` — Staff status badge colors
-- `SALE_STATUS_CLASSES` — Sale status badge colors
-- `PURCHASE_STATUS_CLASSES` — Purchase order status badge colors
-
-### Typography
-Uses system font stack from Tailwind. Inter/Geist will be added when brand is finalised.
-
-### Spacing Pattern
-- Page content padding: `p-6 md:p-8`
-- Card border radius: `rounded-2xl`
-- Card shadow: `shadow-[0_1px_2px_rgba(0,0,0,0.04)]` (default) → `shadow-[0_4px_16px_rgba(0,0,0,0.08)]` (hover)
-- Section headers: `text-2xl font-bold tracking-tight`
-
----
-
-## 10. Keyboard Shortcuts
-
-| Keys | Action |
-|---|---|
-| `Cmd/Ctrl + B` | Toggle sidebar collapse |
-| `/` | Focus header search bar |
-| `Esc` | Close any open modal or drawer |
-
-These are registered in `Header.tsx` via `window.addEventListener('keydown', ...)` inside a `useEffect`.
-
----
-
-## 11. Running Locally
-
-```bash
-# From the repo root or the frontend folder:
-cd frontend
-pnpm dev
-```
-
-Visit: **http://localhost:3000** — redirects automatically to `/dashboard`.
-
-### Prerequisites
-- Node.js 20+
-- pnpm 9+
-
-### Build check (TypeScript)
-```bash
-pnpm tsc --noEmit
-# Should exit with 0 errors
-```
-
-### Production build
-```bash
-pnpm build
-pnpm start
-```
-
----
-
-## 12. What's Next / TODO
-
-### Backend Integration
-- [ ] Replace `lib/mock-data.ts` imports with real API `fetch()` calls per page
-- [ ] Add auth layer (login page, session management, protected routes)
-- [ ] Wire up appointment booking form (currently UI-only)
-- [ ] Connect patient registration form
-- [ ] Implement payment recording flow
-
-### UI Enhancements
-- [ ] `app/reservations/page.tsx` — Add `+` button to create new appointment in empty calendar slots
-- [ ] `app/reservations/page.tsx` — Week view (multi-day calendar)
-- [ ] `app/patients/page.tsx` — Make search/filter interactive (currently static HTML)
-- [ ] `app/patients/page.tsx` — Sort by column (name, last visit, status)
-- [ ] `app/dashboard/page.tsx` — Hook up real date to greeting ("Good morning/afternoon/evening")
-- [ ] `app/payment-methods/page.tsx` — Make toggle buttons actually fire state changes
-- [ ] Add `framer-motion` page transitions (package already installed)
-- [ ] `Cmd+K` global command palette (currently listed as a shortcut but not implemented)
-- [ ] Notification bell with dropdown
-- [ ] Dark mode (CSS variables are already set up, just needs `.dark` class toggle)
-
-### Missing Pages
-- [ ] `/accounts/[id]` — Individual account ledger detail
-- [ ] `/staff/[id]` — Staff member detail / schedule
-- [ ] `/treatments/[id]` — Treatment detail and edit form
-- [ ] `/settings` — Clinic settings (name, hours, SMS templates)
-
-### Performance / Quality
-- [ ] Add `<Suspense>` boundaries for finer loading UX
-- [ ] Add `error.tsx` boundaries per route segment
-- [ ] Write Playwright or Cypress E2E tests for critical flows (check-in, payment)
-- [ ] Add proper meta tags per page (currently only root layout has metadata)
-
-### Legacy Cleanup
-- [ ] Remove or archive `components/reservations-app.tsx` (v1 monolithic prototype, kept for reference)
-
----
-
-## Contribution Notes
-
-### Adding a new page
-1. Create `app/<route>/page.tsx`
-2. Add the route to `navConfig` in `lib/constants.ts` (pick a `lucide-react` icon name)
-3. Add the icon import to `iconMap` in `components/layout/Sidebar.tsx`
-4. Add `loading.tsx` in the same folder for skeleton UX
-
-### Adding mock data
-Edit `lib/mock-data.ts` and add the corresponding type to `types/index.ts`.
-
-### Adding a new status badge color
-Add the mapping to the relevant `*_CLASSES` object in `lib/constants.ts`.
-
-### Connecting a real API
-In a Server Component page:
-```ts
-// Replace:
-import { patients } from '@/lib/mock-data'
-
-// With:
-const patients = await fetch('https://api.zendenta.com/patients', {
-  next: { revalidate: 60 }
-}).then(r => r.json())
-```
-
-No store changes needed — Zustand only holds UI state.

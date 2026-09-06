@@ -57,13 +57,18 @@ export function Sidebar() {
           isCollapsed ? 'justify-center px-0' : 'gap-3 px-7'
         )}
       >
-        <div className="relative flex size-9 shrink-0 items-center justify-center">
-          <div className="absolute size-7 rotate-45 rounded-[10px] bg-primary" />
-          <div className="absolute size-3 rounded-full bg-sky-300" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-5">
+            <path
+              d="M12 2.5C7.5 2.5 4 5 4 9C4 12 5 14.5 6 17.5C7 20.5 8.5 22 10 22C11 22 11.5 20.5 12 18.5C12.5 20.5 13 22 14 22C15.5 22 17 20.5 18 17.5C19 14.5 20 12 20 9C20 5 16.5 2.5 12 2.5Z"
+              fill="currentColor"
+            />
+            <circle cx="9" cy="8" r="1.5" fill="white" opacity="0.8" />
+          </svg>
         </div>
         {!isCollapsed && (
-          <span className="whitespace-nowrap text-[23px] font-bold tracking-tight">
-            Zendenta
+          <span className="whitespace-nowrap text-[23px] font-bold tracking-tight text-foreground">
+            Clinix
           </span>
         )}
       </div>
@@ -163,12 +168,17 @@ export function MobileSidebar() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[92px] items-center gap-3 border-b border-border/60 px-7">
-          <div className="relative flex size-9 shrink-0 items-center justify-center">
-            <div className="absolute size-7 rotate-45 rounded-[10px] bg-primary" />
-            <div className="absolute size-3 rounded-full bg-sky-300" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-5">
+              <path
+                d="M12 2.5C7.5 2.5 4 5 4 9C4 12 5 14.5 6 17.5C7 20.5 8.5 22 10 22C11 22 11.5 20.5 12 18.5C12.5 20.5 13 22 14 22C15.5 22 17 20.5 18 17.5C19 14.5 20 12 20 9C20 5 16.5 2.5 12 2.5Z"
+                fill="currentColor"
+              />
+              <circle cx="9" cy="8" r="1.5" fill="white" opacity="0.8" />
+            </svg>
           </div>
-          <span className="whitespace-nowrap text-[23px] font-bold tracking-tight">
-            Zendenta
+          <span className="whitespace-nowrap text-[23px] font-bold tracking-tight text-foreground">
+            Clinix
           </span>
         </div>
         <nav className="flex-1 overflow-auto px-4 py-5">
