@@ -1,0 +1,250 @@
+import type {
+  Appointment,
+  Dentist,
+  Patient,
+  Treatment,
+  StaffMember,
+  Activity,
+  Alert,
+  InventoryItem,
+  PaymentMethod,
+  SaleRecord,
+  PurchaseOrder,
+  KpiData,
+} from '@/types'
+
+// ─── Dentists ─────────────────────────────────────────────────────────────────
+
+export const dentists: Dentist[] = [
+  {
+    id: 'd1',
+    name: 'Drg Soap Mactavish',
+    specialty: 'General Dentistry',
+    avatar: 'https://i.pravatar.cc/150?img=12',
+    initials: 'SM',
+    statusToday: 'in-session',
+    appointmentsToday: 6,
+  },
+  {
+    id: 'd2',
+    name: "Drg Jerald O'Hara",
+    specialty: 'Orthodontics',
+    avatar: 'https://i.pravatar.cc/150?img=52',
+    initials: 'JO',
+    statusToday: 'available',
+    appointmentsToday: 5,
+  },
+  {
+    id: 'd3',
+    name: 'Drg Putri Larasati',
+    specialty: 'Cosmetic Dentistry',
+    avatar: 'https://i.pravatar.cc/150?img=47',
+    initials: 'PL',
+    statusToday: 'available',
+    appointmentsToday: 5,
+  },
+]
+
+// ─── Appointments (16 for today) ──────────────────────────────────────────────
+
+export const appointments: Appointment[] = [
+  { id: 'a1',  patient: 'Rafli Jainudin',       patientId: 'p1',  time: '09:00 AM › 10:00 AM', startHour: 9,    durationHours: 1,   treatment: 'General Checkup',      status: 'Finished',        color: 'rose',   dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a2',  patient: 'Sekar Nandita',         patientId: 'p2',  time: '10:00 AM › 11:00 AM', startHour: 10,   durationHours: 1,   treatment: 'Scaling',              status: 'Finished',        color: 'sage',   dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a3',  patient: 'Angkasa Pura',          patientId: 'p3',  time: '09:00 AM › 10:30 AM', startHour: 9,    durationHours: 1.5, treatment: 'Bleaching',            status: 'Finished',        color: 'sage',   dentist: "Drg Jerald O'Hara",   dentistId: 'd2' },
+  { id: 'a4',  patient: 'Lembayung Senja',       patientId: 'p4',  time: '11:00 AM › 12:00 PM', startHour: 11,   durationHours: 1,   treatment: 'Extraction',           status: 'Finished',        color: 'sky',    dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a5',  patient: 'Daniswara',             patientId: 'p5',  time: '02:30 PM › 03:30 PM', startHour: 14.5, durationHours: 1,   treatment: 'General Checkup',      status: 'Registered',      color: 'sky',    dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a6',  patient: 'Christopher Smallwood', patientId: 'p6',  time: '02:00 PM › 03:00 PM', startHour: 14,   durationHours: 1,   treatment: 'Tooth Scaling',        status: 'Registered',      color: 'sky',    dentist: 'Drg Putri Larasati',  dentistId: 'd3' },
+  { id: 'a7',  patient: 'Bintang Cahaya',        patientId: 'p7',  time: '10:30 AM › 11:30 AM', startHour: 10.5, durationHours: 1,   treatment: 'Orthodontic Consult',  status: 'Finished',        color: 'purple', dentist: "Drg Jerald O'Hara",   dentistId: 'd2' },
+  { id: 'a8',  patient: 'Rina Amalia',           patientId: 'p8',  time: '12:00 PM › 01:00 PM', startHour: 12,   durationHours: 1,   treatment: 'Whitening',            status: 'Waiting payment', color: 'amber',  dentist: "Drg Jerald O'Hara",   dentistId: 'd2' },
+  { id: 'a9',  patient: 'Ahmad Fauzi',           patientId: 'p9',  time: '09:00 AM › 10:00 AM', startHour: 9,    durationHours: 1,   treatment: 'Implant Consult',      status: 'Finished',        color: 'rose',   dentist: 'Drg Putri Larasati',  dentistId: 'd3' },
+  { id: 'a10', patient: 'Dewi Kartika',          patientId: 'p10', time: '10:00 AM › 11:00 AM', startHour: 10,   durationHours: 1,   treatment: 'Veneers',              status: 'Finished',        color: 'sky',    dentist: 'Drg Putri Larasati',  dentistId: 'd3' },
+  { id: 'a11', patient: 'Hendra Susanto',        patientId: 'p11', time: '11:00 AM › 12:00 PM', startHour: 11,   durationHours: 1,   treatment: 'Braces Adjustment',    status: 'Finished',        color: 'purple', dentist: "Drg Jerald O'Hara",   dentistId: 'd2' },
+  { id: 'a12', patient: 'Maya Indah',            patientId: 'p12', time: '01:00 PM › 02:00 PM', startHour: 13,   durationHours: 1,   treatment: 'Root Canal',           status: 'Waiting payment', color: 'amber',  dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a13', patient: 'Rizki Pratama',         patientId: 'p13', time: '03:00 PM › 04:00 PM', startHour: 15,   durationHours: 1,   treatment: 'Extraction',           status: 'Registered',      color: 'rose',   dentist: 'Drg Soap Mactavish',  dentistId: 'd1' },
+  { id: 'a14', patient: 'Siti Rahayu',           patientId: 'p14', time: '02:00 PM › 03:00 PM', startHour: 14,   durationHours: 1,   treatment: 'Scaling',              status: 'Registered',      color: 'sage',   dentist: "Drg Jerald O'Hara",   dentistId: 'd2' },
+  { id: 'a15', patient: 'Bagus Prasetyo',        patientId: 'p15', time: '03:00 PM › 04:00 PM', startHour: 15,   durationHours: 1,   treatment: 'Implant',              status: 'Registered',      color: 'sky',    dentist: 'Drg Putri Larasati',  dentistId: 'd3' },
+  { id: 'a16', patient: 'Layla Nurhasanah',      patientId: 'p16', time: '01:00 PM › 02:00 PM', startHour: 13,   durationHours: 1,   treatment: 'Crown Fitting',        status: 'In Progress',     color: 'purple', dentist: 'Drg Putri Larasati',  dentistId: 'd3' },
+]
+
+// ─── Patients (24) ────────────────────────────────────────────────────────────
+
+export const patients: Patient[] = [
+  { id: 'p1',  name: 'Rafli Jainudin',        fullName: 'Rafli H. Jainudin',        email: 'rafli@mail.com',            phone: '+62 812-1234-5678', dateOfBirth: '1995-03-15', gender: 'Male',   address: 'Jl. Sudirman No. 12, Jakarta',          lastVisit: '2024-05-16', nextAppointment: '2024-06-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=11' },
+  { id: 'p2',  name: 'Sekar Nandita',         fullName: 'Sekar Nandita Putri',      email: 'sekar@mail.com',            phone: '+62 813-2345-6789', dateOfBirth: '1998-07-22', gender: 'Female', address: 'Jl. Gatot Subroto No. 45, Jakarta',     lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=20' },
+  { id: 'p3',  name: 'Angkasa Pura',          fullName: 'Angkasa Pura Wibowo',      email: 'angkasa@mail.com',          phone: '+62 814-3456-7890', dateOfBirth: '1992-11-08', gender: 'Male',   address: 'Jl. Thamrin No. 7, Jakarta',            lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=15' },
+  { id: 'p4',  name: 'Lembayung Senja',       fullName: 'Lembayung Senja Dewi',     email: 'lembayung@mail.com',        phone: '+62 815-4567-8901', dateOfBirth: '2000-02-14', gender: 'Female', address: 'Jl. Kuningan No. 23, Jakarta',          lastVisit: '2024-05-15', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=25' },
+  { id: 'p5',  name: 'Daniswara',             fullName: 'Daniswara Putra',          email: 'daniswara@mail.com',        phone: '+62 816-5678-9012', dateOfBirth: '1990-09-30', gender: 'Male',   address: 'Jl. Kemang No. 56, Jakarta',            lastVisit: '2024-04-20', nextAppointment: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=8'  },
+  { id: 'p6',  name: 'Christopher Smallwood', fullName: 'Christopher C. Smallwood', email: 'ChristopherW12@mail.com',   phone: '+1 (409)-832-3913', dateOfBirth: '2002-01-21', gender: 'Male',   address: '4337 Lynn Ogden Lane, Beaumont TX',     lastVisit: '2024-05-10', nextAppointment: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=3'  },
+  { id: 'p7',  name: 'Bintang Cahaya',        fullName: 'Bintang Cahaya Putra',     email: 'bintang@mail.com',          phone: '+62 817-6789-0123', dateOfBirth: '1997-05-12', gender: 'Male',   address: 'Jl. Senayan No. 34, Jakarta',           lastVisit: '2024-05-14', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=13' },
+  { id: 'p8',  name: 'Rina Amalia',           fullName: 'Rina Amalia Sari',         email: 'rina@mail.com',             phone: '+62 818-7890-1234', dateOfBirth: '1994-08-19', gender: 'Female', address: 'Jl. Casablanca No. 78, Jakarta',        lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=29' },
+  { id: 'p9',  name: 'Ahmad Fauzi',           fullName: 'Ahmad Fauzi Rahman',       email: 'ahmad@mail.com',            phone: '+62 819-8901-2345', dateOfBirth: '1988-12-03', gender: 'Male',   address: 'Jl. Rasuna Said No. 90, Jakarta',       lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=6'  },
+  { id: 'p10', name: 'Dewi Kartika',          fullName: 'Dewi Kartika Sari',        email: 'dewi@mail.com',             phone: '+62 821-9012-3456', dateOfBirth: '1996-04-27', gender: 'Female', address: 'Jl. Semanggi No. 11, Jakarta',          lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=32' },
+  { id: 'p11', name: 'Hendra Susanto',        fullName: 'Hendra Susanto Wijaya',    email: 'hendra@mail.com',           phone: '+62 822-0123-4567', dateOfBirth: '1993-10-16', gender: 'Male',   address: 'Jl. Veteran No. 44, Jakarta',           lastVisit: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=4'  },
+  { id: 'p12', name: 'Maya Indah',            fullName: 'Maya Indah Permatasari',   email: 'maya@mail.com',             phone: '+62 823-1234-5678', dateOfBirth: '1999-06-08', gender: 'Female', address: 'Jl. Hayam Wuruk No. 22, Jakarta',       lastVisit: '2024-05-13', nextAppointment: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=44' },
+  { id: 'p13', name: 'Rizki Pratama',         fullName: 'Rizki Pratama Putra',      email: 'rizki@mail.com',            phone: '+62 824-2345-6789', dateOfBirth: '2001-01-25', gender: 'Male',   address: 'Jl. Mangga Dua No. 67, Jakarta',        lastVisit: '2024-04-30', nextAppointment: '2024-05-16', status: 'New',      avatarUrl: 'https://i.pravatar.cc/150?img=16' },
+  { id: 'p14', name: 'Siti Rahayu',           fullName: 'Siti Rahayu Harahap',      email: 'siti@mail.com',             phone: '+62 825-3456-7890', dateOfBirth: '1991-09-14', gender: 'Female', address: 'Jl. Pluit No. 33, Jakarta',             lastVisit: '2024-05-08', nextAppointment: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=41' },
+  { id: 'p15', name: 'Bagus Prasetyo',        fullName: 'Bagus Prasetyo Widodo',    email: 'bagus@mail.com',            phone: '+62 826-4567-8901', dateOfBirth: '1987-07-20', gender: 'Male',   address: 'Jl. Pantai Indah Kapuk No. 5, Jakarta', lastVisit: '2024-03-15', nextAppointment: '2024-05-16', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=7'  },
+  { id: 'p16', name: 'Layla Nurhasanah',      fullName: 'Layla Nurhasanah Putri',   email: 'layla@mail.com',            phone: '+62 827-5678-9012', dateOfBirth: '2003-03-07', gender: 'Female', address: 'Jl. Bukit Duri No. 88, Jakarta',        lastVisit: '2024-05-16', status: 'New',      avatarUrl: 'https://i.pravatar.cc/150?img=48' },
+  { id: 'p17', name: 'Farhan Wahyudi',        fullName: 'Farhan Wahyudi Salam',     email: 'farhan@mail.com',           phone: '+62 828-6789-0123', dateOfBirth: '1995-11-29', gender: 'Male',   address: 'Jl. Raya Pasar Minggu No. 17, Jakarta', lastVisit: '2024-04-10', status: 'Inactive', avatarUrl: 'https://i.pravatar.cc/150?img=18' },
+  { id: 'p18', name: 'Nadia Zahra',           fullName: 'Nadia Zahra Amini',        email: 'nadia@mail.com',            phone: '+62 829-7890-1234', dateOfBirth: '1998-02-11', gender: 'Female', address: 'Jl. Fatmawati No. 55, Jakarta',         lastVisit: '2024-05-01', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=36' },
+  { id: 'p19', name: 'Bayu Setiawan',         fullName: 'Bayu Setiawan Putra',      email: 'bayu@mail.com',             phone: '+62 831-8901-2345', dateOfBirth: '1989-08-04', gender: 'Male',   address: 'Jl. Kebayoran Lama No. 71, Jakarta',    lastVisit: '2024-04-25', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=9'  },
+  { id: 'p20', name: 'Putri Maharani',        fullName: 'Putri Maharani Dewi',      email: 'putri@mail.com',            phone: '+62 832-9012-3456', dateOfBirth: '2000-12-18', gender: 'Female', address: 'Jl. Pejaten No. 42, Jakarta',           lastVisit: '2024-05-05', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=38' },
+  { id: 'p21', name: 'Irfan Hakim',           fullName: 'Irfan Hakim Sulaiman',     email: 'irfan@mail.com',            phone: '+62 833-0123-4567', dateOfBirth: '1992-06-23', gender: 'Male',   address: 'Jl. Cipinang No. 13, Jakarta',          lastVisit: '2024-03-28', status: 'Inactive', avatarUrl: 'https://i.pravatar.cc/150?img=14' },
+  { id: 'p22', name: 'Wulandari',             fullName: 'Wulandari Kusuma',         email: 'wulan@mail.com',            phone: '+62 834-1234-5678', dateOfBirth: '1997-04-06', gender: 'Female', address: 'Jl. Rawasari No. 28, Jakarta',          lastVisit: '2024-05-12', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=45' },
+  { id: 'p23', name: 'Teguh Santoso',         fullName: 'Teguh Santoso Wirawan',    email: 'teguh@mail.com',            phone: '+62 835-2345-6789', dateOfBirth: '1986-01-30', gender: 'Male',   address: 'Jl. Matraman No. 62, Jakarta',          lastVisit: '2024-04-18', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=10' },
+  { id: 'p24', name: 'Annisa Febriani',       fullName: 'Annisa Febriani Hakim',    email: 'annisa@mail.com',           phone: '+62 836-3456-7890', dateOfBirth: '2001-10-09', gender: 'Female', address: 'Jl. Klender No. 39, Jakarta',           lastVisit: '2024-05-09', status: 'New',      avatarUrl: 'https://i.pravatar.cc/150?img=46' },
+]
+
+// ─── Treatments (15) ──────────────────────────────────────────────────────────
+
+export const treatments: Treatment[] = [
+  { id: 't1',  name: 'General Checkup',      category: 'Preventive',    durationMinutes: 60,  price: 85,   description: 'Comprehensive dental examination and cleaning',        color: 'sky' },
+  { id: 't2',  name: 'Scaling & Polishing',  category: 'Preventive',    durationMinutes: 90,  price: 120,  description: 'Professional cleaning to remove plaque and tartar',    color: 'sage' },
+  { id: 't3',  name: 'Tooth Extraction',     category: 'Surgical',      durationMinutes: 45,  price: 150,  description: 'Removal of damaged or impacted teeth',                 color: 'rose' },
+  { id: 't4',  name: 'Dental Filling',       category: 'Restorative',   durationMinutes: 60,  price: 180,  description: 'Composite resin or amalgam fillings for cavities',     color: 'amber' },
+  { id: 't5',  name: 'Root Canal',           category: 'Endodontic',    durationMinutes: 120, price: 650,  description: 'Treatment for infected or damaged tooth pulp',         color: 'rose' },
+  { id: 't6',  name: 'Dental Crown',         category: 'Restorative',   durationMinutes: 90,  price: 900,  description: 'Custom-fitted cap to restore damaged teeth',           color: 'sky' },
+  { id: 't7',  name: 'Dental Implant',       category: 'Surgical',      durationMinutes: 180, price: 2500, description: 'Permanent tooth replacement with titanium implant',    color: 'purple' },
+  { id: 't8',  name: 'Teeth Whitening',      category: 'Cosmetic',      durationMinutes: 90,  price: 350,  description: 'Professional bleaching for a brighter smile',          color: 'amber' },
+  { id: 't9',  name: 'Dental Veneers',       category: 'Cosmetic',      durationMinutes: 120, price: 1200, description: 'Thin porcelain shells bonded to front of teeth',      color: 'sky' },
+  { id: 't10', name: 'Orthodontic Consult',  category: 'Orthodontic',   durationMinutes: 60,  price: 150,  description: 'Braces and alignment assessment and planning',         color: 'purple' },
+  { id: 't11', name: 'Braces Installation',  category: 'Orthodontic',   durationMinutes: 120, price: 3500, description: 'Traditional metal or ceramic braces fitting',         color: 'purple' },
+  { id: 't12', name: 'Invisalign',           category: 'Orthodontic',   durationMinutes: 60,  price: 4500, description: 'Clear aligner orthodontic treatment',                color: 'sage' },
+  { id: 't13', name: 'Fluoride Treatment',   category: 'Preventive',    durationMinutes: 30,  price: 45,   description: 'Protective fluoride application for enamel strength', color: 'sage' },
+  { id: 't14', name: 'Gum Treatment',        category: 'Periodontic',   durationMinutes: 90,  price: 300,  description: 'Deep cleaning for gum disease treatment',             color: 'rose' },
+  { id: 't15', name: 'Dental X-Ray',         category: 'Diagnostic',    durationMinutes: 20,  price: 60,   description: 'Digital radiographic imaging for diagnosis',          color: 'amber' },
+]
+
+// ─── Staff (10) ───────────────────────────────────────────────────────────────
+
+export const staff: StaffMember[] = [
+  { id: 's1',  name: 'Dr. Soap Mactavish', role: 'Senior Dentist',     department: 'General Dentistry', phone: '+62 811-1111-1111', email: 'soap@avicena.com',    initials: 'SM', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=12' },
+  { id: 's2',  name: "Dr. Jerald O'Hara",  role: 'Orthodontist',       department: 'Orthodontics',      phone: '+62 811-2222-2222', email: 'jerald@avicena.com',  initials: 'JO', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=52' },
+  { id: 's3',  name: 'Dr. Putri Larasati', role: 'Cosmetic Dentist',   department: 'Cosmetic',          phone: '+62 811-3333-3333', email: 'putri@avicena.com',   initials: 'PL', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=47' },
+  { id: 's4',  name: 'Darrell Steward',    role: 'Clinic Admin',       department: 'Administration',   phone: '+62 811-4444-4444', email: 'darrell@avicena.com', initials: 'DS', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=33' },
+  { id: 's5',  name: 'Ayu Pratiwi',        role: 'Receptionist',       department: 'Front Office',     phone: '+62 811-5555-5555', email: 'ayu@avicena.com',     initials: 'AP', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=24' },
+  { id: 's6',  name: 'Rendi Kusuma',       role: 'Dental Assistant',   department: 'General Dentistry', phone: '+62 811-6666-6666', email: 'rendi@avicena.com',   initials: 'RK', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=17' },
+  { id: 's7',  name: 'Linda Santoso',      role: 'Dental Assistant',   department: 'Orthodontics',      phone: '+62 811-7777-7777', email: 'linda@avicena.com',   initials: 'LS', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=30' },
+  { id: 's8',  name: 'Budi Hartanto',      role: 'Sterilization Tech', department: 'Support',           phone: '+62 811-8888-8888', email: 'budi@avicena.com',    initials: 'BH', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=19' },
+  { id: 's9',  name: 'Fitri Andriani',     role: 'Billing Specialist', department: 'Finance',           phone: '+62 811-9999-9999', email: 'fitri@avicena.com',   initials: 'FA', status: 'On Leave', avatarUrl: 'https://i.pravatar.cc/150?img=40' },
+  { id: 's10', name: 'Gunawan Prasetyo',   role: 'IT Support',         department: 'Technology',        phone: '+62 812-0000-0000', email: 'gunawan@avicena.com', initials: 'GP', status: 'Active',   avatarUrl: 'https://i.pravatar.cc/150?img=21' },
+]
+
+// ─── Activities (12) ──────────────────────────────────────────────────────────
+
+const now = Date.now()
+export const activities: Activity[] = [
+  { id: 'act1',  type: 'check-in',    description: 'Rafli Jainudin checked in for General Checkup',           timestamp: new Date(now - 5   * 60000).toISOString() },
+  { id: 'act2',  type: 'payment',     description: 'Sekar Nandita paid $120 for Scaling',                      timestamp: new Date(now - 22  * 60000).toISOString() },
+  { id: 'act3',  type: 'sms',         description: 'Reminder SMS sent to Daniswara',                           timestamp: new Date(now - 35  * 60000).toISOString() },
+  { id: 'act4',  type: 'check-in',    description: 'Angkasa Pura checked in for Bleaching',                    timestamp: new Date(now - 55  * 60000).toISOString() },
+  { id: 'act5',  type: 'new-patient', description: 'New patient: Layla Nurhasanah registered',                 timestamp: new Date(now - 72  * 60000).toISOString() },
+  { id: 'act6',  type: 'appointment', description: 'Christopher Smallwood appointment confirmed',               timestamp: new Date(now - 90  * 60000).toISOString() },
+  { id: 'act7',  type: 'payment',     description: 'Ahmad Fauzi paid $150 for Implant Consult',                timestamp: new Date(now - 120 * 60000).toISOString() },
+  { id: 'act8',  type: 'reschedule',  description: 'Hendra Susanto rescheduled to next week',                  timestamp: new Date(now - 150 * 60000).toISOString() },
+  { id: 'act9',  type: 'check-in',    description: 'Lembayung Senja checked in for Extraction',                timestamp: new Date(now - 180 * 60000).toISOString() },
+  { id: 'act10', type: 'sms',         description: 'Payment reminder sent to Rina Amalia',                     timestamp: new Date(now - 210 * 60000).toISOString() },
+  { id: 'act11', type: 'new-patient', description: 'New patient: Rizki Pratama registered',                    timestamp: new Date(now - 240 * 60000).toISOString() },
+  { id: 'act12', type: 'payment',     description: 'Bintang Cahaya paid $150 for Orthodontic Consult',         timestamp: new Date(now - 300 * 60000).toISOString() },
+]
+
+// ─── Alerts (6) ───────────────────────────────────────────────────────────────
+
+export const alerts: Alert[] = [
+  { id: 'al1', type: 'follow-up', title: 'Follow-up call needed',   description: "Rina Amalia has an unpaid bill from last visit",         priority: 'high',   actionLabel: 'Call now' },
+  { id: 'al2', type: 'insurance', title: 'Insurance claim pending', description: "Maya Indah's claim is pending approval (3 days)",        priority: 'medium', actionLabel: 'Review' },
+  { id: 'al3', type: 'stock',     title: 'Low stock: Gloves (M)',   description: 'Only 12 boxes remaining — reorder threshold: 20',        priority: 'high',   actionLabel: 'Reorder' },
+  { id: 'al4', type: 'follow-up', title: 'Post-op check needed',    description: "Bagus Prasetyo's implant follow-up is overdue",          priority: 'medium', actionLabel: 'Schedule' },
+  { id: 'al5', type: 'payment',   title: 'Payment overdue',         description: 'Christopher Smallwood — Bill #10102 unpaid 7 days',      priority: 'high',   actionLabel: 'Send reminder' },
+  { id: 'al6', type: 'stock',     title: 'Low stock: Anesthetic',   description: 'Lidocaine 2% stock below critical level',                priority: 'high',   actionLabel: 'Order' },
+]
+
+// ─── Inventory (20) ───────────────────────────────────────────────────────────
+
+export const inventory: InventoryItem[] = [
+  { id: 'inv1',  name: 'Examination Gloves (M)',   category: 'Consumables',     quantity: 12,  minStock: 20, unit: 'box',     unitPrice: 8.50,   supplier: 'MedSupply Co.' },
+  { id: 'inv2',  name: 'Examination Gloves (L)',   category: 'Consumables',     quantity: 28,  minStock: 20, unit: 'box',     unitPrice: 8.50,   supplier: 'MedSupply Co.' },
+  { id: 'inv3',  name: 'Disposable Masks',         category: 'Consumables',     quantity: 150, minStock: 50, unit: 'pcs',     unitPrice: 0.30,   supplier: 'MedSupply Co.' },
+  { id: 'inv4',  name: 'Dental Cotton Rolls',      category: 'Consumables',     quantity: 8,   minStock: 15, unit: 'pack',    unitPrice: 5.00,   supplier: 'DentaStore' },
+  { id: 'inv5',  name: 'Lidocaine 2% Anesthetic',  category: 'Pharmaceuticals', quantity: 5,   minStock: 10, unit: 'vial',    unitPrice: 12.00,  supplier: 'PharmaCare' },
+  { id: 'inv6',  name: 'Dental Composite Resin',   category: 'Materials',       quantity: 22,  minStock: 10, unit: 'syringe', unitPrice: 35.00,  supplier: 'DentaStore' },
+  { id: 'inv7',  name: 'Dental Floss Picks',       category: 'Consumables',     quantity: 200, minStock: 100,unit: 'pcs',     unitPrice: 0.15,   supplier: 'MedSupply Co.' },
+  { id: 'inv8',  name: 'Sterilization Pouches',    category: 'Consumables',     quantity: 45,  minStock: 30, unit: 'pack',    unitPrice: 18.00,  supplier: 'SterilTech' },
+  { id: 'inv9',  name: 'Dental Mirrors',           category: 'Instruments',     quantity: 15,  minStock: 10, unit: 'pcs',     unitPrice: 4.50,   supplier: 'DentaStore' },
+  { id: 'inv10', name: 'Dental Probes',            category: 'Instruments',     quantity: 12,  minStock: 10, unit: 'pcs',     unitPrice: 6.00,   supplier: 'DentaStore' },
+  { id: 'inv11', name: 'Impression Material',      category: 'Materials',       quantity: 7,   minStock: 5,  unit: 'pack',    unitPrice: 45.00,  supplier: 'DentaCraft' },
+  { id: 'inv12', name: 'Hydrogen Peroxide 35%',    category: 'Pharmaceuticals', quantity: 18,  minStock: 8,  unit: 'bottle',  unitPrice: 22.00,  supplier: 'PharmaCare' },
+  { id: 'inv13', name: 'Dental Bur Set',           category: 'Instruments',     quantity: 6,   minStock: 5,  unit: 'set',     unitPrice: 120.00, supplier: 'DentaStore' },
+  { id: 'inv14', name: 'Suture Thread 3-0',        category: 'Consumables',     quantity: 4,   minStock: 8,  unit: 'pack',    unitPrice: 28.00,  supplier: 'MedSupply Co.' },
+  { id: 'inv15', name: 'X-Ray Film (Periapical)',  category: 'Diagnostic',      quantity: 35,  minStock: 20, unit: 'pack',    unitPrice: 32.00,  supplier: 'RadioCare' },
+  { id: 'inv16', name: 'Disposable Syringes',      category: 'Consumables',     quantity: 80,  minStock: 50, unit: 'pcs',     unitPrice: 0.45,   supplier: 'MedSupply Co.' },
+  { id: 'inv17', name: 'Polishing Paste',          category: 'Materials',       quantity: 9,   minStock: 5,  unit: 'tube',    unitPrice: 14.00,  supplier: 'DentaStore' },
+  { id: 'inv18', name: 'Calcium Hydroxide Paste',  category: 'Materials',       quantity: 11,  minStock: 5,  unit: 'syringe', unitPrice: 18.00,  supplier: 'DentaCraft' },
+  { id: 'inv19', name: 'Articulating Paper',       category: 'Consumables',     quantity: 18,  minStock: 10, unit: 'book',    unitPrice: 8.00,   supplier: 'DentaStore' },
+  { id: 'inv20', name: 'Periodontal Probe',        category: 'Instruments',     quantity: 8,   minStock: 5,  unit: 'pcs',     unitPrice: 9.50,   supplier: 'DentaStore' },
+]
+
+// ─── Payment Methods (8) ──────────────────────────────────────────────────────
+
+export const paymentMethods: PaymentMethod[] = [
+  { id: 'pm1', name: 'Cash',                type: 'Cash',        enabled: true,  processingFee: 'None' },
+  { id: 'pm2', name: 'Credit / Debit Card', type: 'Card',        enabled: true,  processingFee: '1.5%' },
+  { id: 'pm3', name: 'QRIS',               type: 'Digital',     enabled: true,  processingFee: '0.7%' },
+  { id: 'pm4', name: 'Bank Transfer',       type: 'Bank',        enabled: true,  processingFee: 'None' },
+  { id: 'pm5', name: 'BPJS Kesehatan',     type: 'Insurance',   enabled: true,  processingFee: 'N/A' },
+  { id: 'pm6', name: 'Asuransi Swasta',    type: 'Insurance',   enabled: true,  processingFee: 'Varies' },
+  { id: 'pm7', name: 'GoPay / OVO',        type: 'E-Wallet',    enabled: true,  processingFee: '0.5%' },
+  { id: 'pm8', name: 'Paylater',           type: 'Installment', enabled: false, processingFee: 'TBD' },
+]
+
+// ─── Sales Records ────────────────────────────────────────────────────────────
+
+export const salesRecords: SaleRecord[] = [
+  { id: 'sr1',  date: '2024-05-16', patient: 'Rafli Jainudin',        treatment: 'General Checkup',   amount: 85,   status: 'Paid',    method: 'Cash' },
+  { id: 'sr2',  date: '2024-05-16', patient: 'Sekar Nandita',         treatment: 'Scaling',           amount: 120,  status: 'Paid',    method: 'Card' },
+  { id: 'sr3',  date: '2024-05-16', patient: 'Angkasa Pura',          treatment: 'Bleaching',         amount: 350,  status: 'Paid',    method: 'Transfer' },
+  { id: 'sr4',  date: '2024-05-16', patient: 'Lembayung Senja',       treatment: 'Extraction',        amount: 150,  status: 'Paid',    method: 'QRIS' },
+  { id: 'sr5',  date: '2024-05-16', patient: 'Bintang Cahaya',        treatment: 'Ortho Consult',     amount: 150,  status: 'Paid',    method: 'Card' },
+  { id: 'sr6',  date: '2024-05-16', patient: 'Rina Amalia',           treatment: 'Whitening',         amount: 350,  status: 'Pending', method: 'Transfer' },
+  { id: 'sr7',  date: '2024-05-16', patient: 'Ahmad Fauzi',           treatment: 'Implant Consult',   amount: 150,  status: 'Paid',    method: 'Cash' },
+  { id: 'sr8',  date: '2024-05-16', patient: 'Dewi Kartika',          treatment: 'Veneers',           amount: 1200, status: 'Paid',    method: 'Card' },
+  { id: 'sr9',  date: '2024-05-16', patient: 'Christopher Smallwood', treatment: 'Tooth Scaling',     amount: 120,  status: 'Overdue', method: 'Transfer' },
+  { id: 'sr10', date: '2024-05-15', patient: 'Hendra Susanto',        treatment: 'Braces Adjustment', amount: 85,   status: 'Paid',    method: 'QRIS' },
+  { id: 'sr11', date: '2024-05-15', patient: 'Maya Indah',            treatment: 'Root Canal',        amount: 650,  status: 'Pending', method: 'Insurance' },
+  { id: 'sr12', date: '2024-05-14', patient: 'Putri Maharani',        treatment: 'General Checkup',   amount: 85,   status: 'Paid',    method: 'Cash' },
+  { id: 'sr13', date: '2024-05-14', patient: 'Nadia Zahra',           treatment: 'Teeth Whitening',   amount: 350,  status: 'Paid',    method: 'Card' },
+  { id: 'sr14', date: '2024-05-13', patient: 'Bayu Setiawan',         treatment: 'Scaling',           amount: 120,  status: 'Paid',    method: 'Cash' },
+  { id: 'sr15', date: '2024-05-13', patient: 'Wulandari',             treatment: 'Fluoride Treatment',amount: 45,   status: 'Paid',    method: 'QRIS' },
+]
+
+// ─── Purchase Orders ──────────────────────────────────────────────────────────
+
+export const purchaseOrders: PurchaseOrder[] = [
+  { id: 'po1', vendor: 'MedSupply Co.', date: '2024-05-15', items: 'Gloves (M) x 20, Masks x 200',           amount: 230, status: 'Received' },
+  { id: 'po2', vendor: 'DentaStore',    date: '2024-05-14', items: 'Composite Resin x 10, Mirrors x 5',       amount: 372, status: 'Received' },
+  { id: 'po3', vendor: 'PharmaCare',    date: '2024-05-13', items: 'Lidocaine 2% x 20 vials',                 amount: 240, status: 'Pending' },
+  { id: 'po4', vendor: 'SterilTech',    date: '2024-05-12', items: 'Sterilization Pouches x 10 packs',        amount: 180, status: 'Received' },
+  { id: 'po5', vendor: 'DentaCraft',    date: '2024-05-11', items: 'Impression Material x 5 packs',           amount: 225, status: 'Ordered' },
+  { id: 'po6', vendor: 'RadioCare',     date: '2024-05-10', items: 'X-Ray Film x 5 packs',                    amount: 160, status: 'Received' },
+  { id: 'po7', vendor: 'MedSupply Co.', date: '2024-05-09', items: 'Suture Thread x 10, Syringes x 100',      amount: 325, status: 'Ordered' },
+  { id: 'po8', vendor: 'DentaStore',    date: '2024-05-08', items: 'Bur Set x 3, Periodontal Probes x 5',    amount: 407, status: 'Pending' },
+]
+
+// ─── Dashboard KPIs ───────────────────────────────────────────────────────────
+
+export const kpiData: KpiData[] = [
+  { label: "Today's Appointments", value: 16,       trend: '↑12% vs yesterday', trendUp: true },
+  { label: 'Checked In',           value: '3 / 16', trend: '19% checked in',    trendUp: true,  progressPct: 19, subLabel: '3 of 16 complete' },
+  { label: 'Waiting Room',         value: 2,        trend: 'Longest: 12 min',   trendUp: false, subLabel: '2 patients waiting' },
+  { label: "Today's Revenue",      value: '$1,240', trend: '↑8% vs yesterday',  trendUp: true },
+]
+
+// ─── Current User ─────────────────────────────────────────────────────────────
+
+export const currentUser = {
+  name: 'Darrell Steward',
+  role: 'Super admin',
+  initials: 'DS',
+  clinic: 'Avicena Clinic',
+  clinicAddress: '845 Euclid Avenue, CA',
+}
