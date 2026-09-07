@@ -21,8 +21,8 @@ import {
 } from '@/lib/appointment-lifecycle'
 import { PatientAvatar } from '@/components/patients/PatientAvatar'
 import { DashboardQuickActions } from '@/components/dashboard/DashboardQuickActions'
-
-
+import { cn } from '@/lib/utils'
+import { eventBus } from '@/lib/event-bus'
 
 export default function DashboardPage() {
   const [appointments, setAppointments] = useState<any[]>([])
@@ -31,7 +31,6 @@ export default function DashboardPage() {
   const [requests, setRequests] = useState<PatientRequestResponse[]>([])
   const [waitingList, setWaitingList] = useState<WaitingPatient[]>([])
   const [toastMsg, setToastMsg] = useState<string | null>(null)
-
 
   const todayStr = new Date().toISOString().split('T')[0]
 
@@ -99,14 +98,14 @@ export default function DashboardPage() {
             `https://i.pravatar.cc/150?img=${(idx + 1) * 7}`,
 
           checkedInAt:
+            a.check_in_time ||
+            a.checked_in_at ||
+            a.created_at ||
             new Date(
               Date.now() -
                 (idx + 1) * 12 * 60000
             ).toISOString(),
 
-          // FIX:
-          // These names must match the WaitingPatient
-          // properties used below in the JSX.
           dentistName:
             a.dentist_name ||
             a.dentist ||
@@ -117,13 +116,14 @@ export default function DashboardPage() {
             a.dentistId ||
             'doc-fallback',
 
-
           treatment:
             a.treatment_name ||
             a.treatment ||
             'Checkup',
 
           status: 'waiting' as const,
+          source: a.source,
+          queueNumber: idx + 1,
         }))
 
       setWaitingList(checkedIn)
@@ -147,7 +147,20 @@ export default function DashboardPage() {
       loadDashboardData()
     }
     window.addEventListener('appointment-created', handleGlobalCreated)
-    return () => window.removeEventListener('appointment-created', handleGlobalCreated)
+
+    // Also listen to internal event bus for instant updates
+    const unsubWalkin = eventBus.on('walkin:added', () => {
+      loadDashboardData()
+    })
+    const unsubAppt = eventBus.on('appointment:created', () => {
+      loadDashboardData()
+    })
+
+    return () => {
+      window.removeEventListener('appointment-created', handleGlobalCreated)
+      unsubWalkin()
+      unsubAppt()
+    }
   }, [todayStr])
 
   // Up Next Card:
@@ -218,8 +231,42 @@ export default function DashboardPage() {
     )
 
     showToast(
-      `✓ ${patientName} called into treatment room`
+      `✓ ${patientName} called to reception`
     )
+  }
+
+  const handleStartTreatment = async (
+    waitId: string,
+    patientName: string
+  ) => {
+    setWaitingList((prev) =>
+      prev.filter((w) => w.id !== waitId)
+    )
+    showToast(`✓ ${patientName}'s treatment started (In-Progress)`)
+
+    try {
+      await api.appointments.updateStatus(waitId, 'in-progress')
+      await loadDashboardData()
+    } catch (err) {
+      console.warn('Could not update status to in-progress:', err)
+    }
+  }
+
+  const handleMarkLeft = async (
+    waitId: string,
+    patientName: string
+  ) => {
+    setWaitingList((prev) =>
+      prev.filter((w) => w.id !== waitId)
+    )
+    showToast(`${patientName} marked as left / no-show`)
+
+    try {
+      await api.appointments.updateStatus(waitId, 'no-show')
+      await loadDashboardData()
+    } catch (err) {
+      console.warn('Could not update status to no-show:', err)
+    }
   }
 
   const handleReviewRequest = async (
@@ -572,53 +619,81 @@ export default function DashboardPage() {
                   const isRed =
                     minutes >= 20
 
+                  const isWalkIn = wait.source === 'WALK_IN' || wait.source === 'walk-in'
+
                   return (
                     <div
                       key={`wait-${wait.id}-${idx}`}
-                      className="flex items-center justify-between rounded-xl border border-border p-3.5 bg-background transition hover:bg-muted/30"
+                      className={cn(
+                        "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 rounded-xl border p-3.5 bg-background transition hover:bg-muted/30",
+                        isWalkIn ? "border-dashed border-amber-300 dark:border-amber-900/60" : "border-border"
+                      )}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-black text-muted-foreground border border-border">
+                          #{wait.queueNumber || idx + 1}
+                        </div>
                         <PatientAvatar
                           name={wait.patientName}
                           size="md"
                         />
 
-                        <div>
-                          <p className="font-bold text-xs text-foreground">
-                            {wait.patientName}
-                          </p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-xs text-foreground truncate">
+                              {wait.patientName}
+                            </p>
+                            {isWalkIn && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100/90 text-amber-800 px-1.5 py-0.2 text-[9px] font-extrabold border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+                                🚶 Walk-in
+                              </span>
+                            )}
+                          </div>
 
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="text-[11px] text-muted-foreground truncate">
                             {wait.treatment} ·{' '}
                             {wait.dentistName}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
                         <span
-                          className={`rounded-lg px-2.5 py-1 text-xs font-bold flex items-center gap-1 border ${
+                          className={`rounded-lg px-2.5 py-1 text-[11px] font-bold flex items-center gap-1 border ${
                             isRed
-                              ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
+                              ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse dark:bg-rose-950/50 dark:text-rose-300'
                               : isAmber
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : 'bg-muted text-muted-foreground border-border'
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
                           }`}
                         >
                           <Clock className="size-3" />
-                          {minutes} min wait
+                          {minutes}m wait
                         </span>
 
                         <button
                           onClick={() =>
-                            handleCallInWaiting(
+                            handleStartTreatment(
                               wait.id,
                               wait.patientName
                             )
                           }
-                          className="rounded-xl border border-primary text-primary px-3 py-1.5 text-xs font-bold hover:bg-primary/10 transition active:scale-[0.98]"
+                          className="rounded-xl bg-primary text-primary-foreground px-3 py-1.5 text-xs font-bold hover:opacity-90 transition active:scale-[0.98] shadow-xs"
                         >
-                          Call In
+                          Start Now
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleMarkLeft(
+                              wait.id,
+                              wait.patientName
+                            )
+                          }
+                          title="Mark patient as left without treatment"
+                          className="rounded-xl border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 px-2.5 py-1.5 text-xs font-semibold hover:bg-destructive/5 transition active:scale-[0.98]"
+                        >
+                          Mark Left
                         </button>
                       </div>
                     </div>

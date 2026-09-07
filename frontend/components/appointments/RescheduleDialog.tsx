@@ -167,7 +167,7 @@ export function RescheduleDialog({
                 className="w-full rounded-xl border border-border bg-card p-2.5 text-xs outline-none focus:border-primary"
               >
                 {dentistsList.map((d) => (
-                  <option key={d.dentist_id || d.id} value={d.dentist_id || d.id}>
+                  <option key={d.dentist_id} value={d.dentist_id}>
                     {d.name} ({d.specialty})
                   </option>
                 ))}

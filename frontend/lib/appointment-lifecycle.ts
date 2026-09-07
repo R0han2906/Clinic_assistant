@@ -45,14 +45,14 @@ export const RECEPTIONIST_ACTIONS: Record<AppointmentStatus, ReceptionistAction[
   scheduled: [
     { id: 'check-in', label: 'Check In', icon: 'UserCheck', variant: 'primary' },
     { id: 'reschedule', label: 'Reschedule', icon: 'Calendar', variant: 'outline' },
-    { id: 'cancel', label: 'Cancel', icon: 'X', variant: 'danger' },
+    { id: 'cancel', label: 'Cancel / Delete', icon: 'X', variant: 'danger' },
     { id: 'call', label: 'Call Patient', icon: 'Phone', variant: 'outline' },
     { id: 'sms', label: 'Send Reminder', icon: 'MessageSquare', variant: 'outline' },
   ],
   'checked-in': [
     { id: 'notify', label: 'Notify Dentist', icon: 'Bell', variant: 'primary' },
     { id: 'no-show', label: 'Mark No-Show', icon: 'UserX', variant: 'outline' },
-    { id: 'cancel', label: 'Cancel', icon: 'X', variant: 'danger' },
+    { id: 'cancel', label: 'Cancel / Delete', icon: 'X', variant: 'danger' },
   ],
   'in-progress': [
     { id: 'view', label: 'View Only', icon: 'Eye', disabled: true, variant: 'outline' },

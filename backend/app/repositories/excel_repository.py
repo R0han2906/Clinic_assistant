@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 from pathlib import Path
+import re
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 import openpyxl
@@ -646,17 +647,39 @@ class ExcelClinicRepository(BaseClinicRepository):
     def _get_dentist_unlocked(
         self, all_data: Dict, dentist_id: str
     ) -> Optional[DentistResponse]:
-        """Finds a dentist by ID or short alias (d1, d2, d3). No lock."""
-        id_lower = dentist_id.lower()
+        """Finds a dentist by ID or short alias (d1, d2, d3, den-000001, etc.). No lock."""
+        if not dentist_id:
+            return None
+        id_lower = str(dentist_id).lower().strip()
         alias_map = {
             "d1": "doc-000001",
             "d2": "doc-000002",
             "d3": "doc-000003",
+            "den-000001": "doc-000001",
+            "den-000002": "doc-000002",
+            "den-000003": "doc-000003",
+            "den-1": "doc-000001",
+            "den-2": "doc-000002",
+            "den-3": "doc-000003",
+            "1": "doc-000001",
+            "2": "doc-000002",
+            "3": "doc-000003",
         }
         target_id = alias_map.get(id_lower, id_lower)
+        if target_id.startswith("den-"):
+            target_id = "doc-" + target_id[4:]
+
+        m_query = re.search(r'(?:den|doc|d)?-?0*(\d+)$', id_lower)
+        query_num = m_query.group(1) if m_query else None
+
         for d in self._list_dentists_unlocked(all_data, active_only=False):
-            if d.dentist_id.lower() == target_id or d.dentist_id.lower() == id_lower:
+            d_lower = d.dentist_id.lower()
+            if d_lower == target_id or d_lower == id_lower:
                 return d
+            if query_num:
+                m_d = re.search(r'(?:den|doc|d)?-?0*(\d+)$', d_lower)
+                if m_d and m_d.group(1) == query_num:
+                    return d
         return None
 
     def create_dentist(self, dentist_data: DentistCreate) -> DentistResponse:
@@ -961,8 +984,8 @@ class ExcelClinicRepository(BaseClinicRepository):
             dentists_map = {d.get("dentist_id"): d.get("name") for d in all_data.get(SHEET_DENTISTS, [])}
 
             # Conflict double-check under lock using in-memory data (no extra lock)
-            alias_map = {"d1": "DOC-000001", "d2": "DOC-000002", "d3": "DOC-000003"}
-            target_dentist_id = alias_map.get(appointment_data.dentist_id.lower(), appointment_data.dentist_id)
+            canonical_doc = self._get_dentist_unlocked(all_data, appointment_data.dentist_id)
+            target_dentist_id = canonical_doc.dentist_id if canonical_doc else appointment_data.dentist_id
 
             for r in apt_rows:
                 r_doc = r.get("dentist_id", "").lower()

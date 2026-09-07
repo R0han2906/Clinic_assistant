@@ -58,6 +58,8 @@ export interface WaitingPatient {
   treatment: string
   checkedInAt: string
   priority?: 'normal' | 'urgent'
+  source?: string
+  queueNumber?: number
 }
 
 export interface Appointment {
@@ -85,6 +87,7 @@ export interface Appointment {
   patientAge?: number
   billNumber?: string
   payment_status?: string
+  source?: string
   visitSummary?: VisitSummary
 }
 

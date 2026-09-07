@@ -12,6 +12,7 @@ import { api } from '@/lib/api-client'
 import { DentistResponse, PatientResponse, SlotResponse } from '@/types/api'
 import { cn } from '@/lib/utils'
 import { normalizeStatus, getStatusMeta, AppointmentStatus } from '@/lib/appointment-lifecycle'
+import { eventBus } from '@/lib/event-bus'
 import {
   CALENDAR_START_HOUR,
   CALENDAR_END_HOUR,
@@ -45,6 +46,11 @@ const RescheduleDialog = dynamic(
 
 const CancelDialog = dynamic(
   () => import('@/components/appointments/CancelDialog').then((m) => m.CancelDialog),
+  { ssr: false }
+)
+
+const WalkInSheet = dynamic(
+  () => import('@/components/appointments/WalkInSheet').then((m) => m.WalkInSheet),
   { ssr: false }
 )
 
@@ -550,6 +556,8 @@ function CalendarGrid({
           const docId = dentist.dentist_id || dentist.id || `doc-${colIdx}`
 
           const dentistAppts = appointments.filter((a) => {
+            if (normalizeStatus(a.status || (a as any).payment_status) === 'cancelled') return false
+
             const matchesCurrent = matchAppointmentToDentist(a, dentist, docId)
             if (matchesCurrent) return true
 
@@ -636,13 +644,14 @@ function CalendarGrid({
               {positionedAppts.map((appt, idx) => {
                 const status = normalizeStatus(appt.status || (appt as any).payment_status)
                 const statusMeta = getStatusMeta(status)
-                const isCancelled = status === 'cancelled'
 
                 const patientName = appt.patient || (appt as any).patient_name || 'Patient'
                 const treatment = appt.treatment || (appt as any).treatment_name || 'General Checkup'
                 const timeString = appt.time || `${appt.start_time || '09:00 AM'} › ${appt.end_time || '10:00 AM'}`
                 const apptId = appt.id || (appt as any).appointment_id || `apt-${idx}`
-                const isDraggable = !isCancelled && status !== 'completed' && status !== 'paid'
+                const isDraggable = status !== 'completed' && status !== 'paid'
+
+                const isWalkIn = appt.source === 'WALK_IN' || (appt as any).source === 'walk-in'
 
                 return (
                   <div
@@ -677,29 +686,27 @@ function CalendarGrid({
                       left: `calc(${appt.leftPercent}% + 2px)`,
                       width: `calc(${appt.widthPercent}% - 4px)`,
                       zIndex: appt.zIndex,
-                      ...(isCancelled && {
-                        backgroundImage:
-                          'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(148, 163, 184, 0.18) 6px, rgba(148, 163, 184, 0.18) 12px)',
-                      }),
                     }}
                     className={cn(
                       'absolute rounded-xl border p-2 text-left shadow-xs transition-all duration-150 hover:scale-[1.02] hover:z-50 hover:shadow-lg flex flex-col justify-between overflow-hidden group select-none',
-                      isCancelled
-                        ? 'bg-slate-100/60 text-slate-400 border-dashed border-slate-300 opacity-55 hover:opacity-100 dark:bg-slate-900/40 dark:border-slate-800'
-                        : isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                      !isCancelled && statusMeta.cardBgClass,
-                      !isCancelled && statusMeta.borderClass,
+                      isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                      statusMeta.cardBgClass,
+                      isWalkIn ? 'border-dashed border-amber-400/90 shadow-amber-500/5' : statusMeta.borderClass,
                       draggingApptId === apptId && 'opacity-40 ring-2 ring-primary ring-offset-2 scale-95'
                     )}
                   >
                     <div className="flex items-start justify-between gap-1 w-full">
                       <div className="min-w-0 flex-1">
-                        <p className={cn(
-                          "font-bold text-[11px] truncate group-hover:text-primary transition-colors",
-                          isCancelled ? "line-through text-slate-500" : "text-foreground"
-                        )}>
-                          {patientName}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-[11px] truncate group-hover:text-primary transition-colors text-foreground">
+                            {patientName}
+                          </p>
+                          {isWalkIn && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100/90 text-amber-800 px-1.5 py-0.2 text-[8px] font-extrabold border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 shrink-0">
+                              🚶 Walk-in
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-muted-foreground truncate font-medium">
                           {treatment}
                         </p>
@@ -766,17 +773,36 @@ export function CalendarBoard({
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
+  const [walkInSheetOpen, setWalkInSheetOpen] = useState(false)
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (searchParams.get('new') === 'true' || searchParams.get('walkin') === 'true') {
+    if (searchParams.get('walkin') === 'true') {
+      setWalkInSheetOpen(true)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('walkin')
+      window.history.replaceState({}, '', url.toString())
+    } else if (searchParams.get('new') === 'true') {
       setBookingModalOpen(true)
       const url = new URL(window.location.href)
       url.searchParams.delete('new')
-      url.searchParams.delete('walkin')
       window.history.replaceState({}, '', url.toString())
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const handleOpenWalkIn = () => setWalkInSheetOpen(true)
+    window.addEventListener('open-walkin-sheet', handleOpenWalkIn)
+    return () => window.removeEventListener('open-walkin-sheet', handleOpenWalkIn)
+  }, [])
+
+  // Cancelled or deleted appointments are completely hidden from the calendar grid
+  const calendarAppointments = useMemo(() => {
+    return appointments.filter((a) => {
+      const s = normalizeStatus(a.status || a.payment_status)
+      return s !== 'cancelled'
+    })
+  }, [appointments])
 
   // Load from API exclusively — always reflects real backend state
   const loadData = async () => {
@@ -840,9 +866,19 @@ export function CalendarBoard({
     }
     window.addEventListener('appointment-created', handleGlobalCreated)
     window.addEventListener('appointment-updated', handleGlobalUpdated)
+
+    const unbindBus = eventBus.on('appointment:created', ({ appointment }) => {
+      if (appointment) {
+        handleAppointmentCreated(appointment)
+      } else {
+        loadData()
+      }
+    })
+
     return () => {
       window.removeEventListener('appointment-created', handleGlobalCreated)
       window.removeEventListener('appointment-updated', handleGlobalUpdated)
+      unbindBus()
     }
   }, [selectedDate])
 
@@ -1042,6 +1078,14 @@ export function CalendarBoard({
             <Download className="size-4" /> Export
           </button>
           <button
+            onClick={() => setWalkInSheetOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 transition active:scale-95 cursor-pointer"
+            aria-label="Walk-In Intake"
+          >
+            <Plus className="size-4" />
+            <span>Walk-In</span>
+          </button>
+          <button
             onClick={() => setBookingModalOpen(true)}
             className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:opacity-90 active:scale-[0.98]"
           >
@@ -1054,7 +1098,7 @@ export function CalendarBoard({
       {activeTab === 'calendar' ? (
         <CalendarGrid
           dentists={dentists}
-          appointments={appointments}
+          appointments={calendarAppointments}
           onSelectAppt={(appt) => setSelectedAppt(appt)}
           onRescheduleDrop={handleDragReschedule}
           loading={loading}
@@ -1169,6 +1213,7 @@ export function CalendarBoard({
           onSuccess={(reason) => {
             handleUpdateStatus('cancelled')
             setCancelOpen(false)
+            setSelectedAppt(null)
           }}
           onOfferRebook={() => {
             setCancelOpen(false)
@@ -1184,6 +1229,22 @@ export function CalendarBoard({
           dentists={dentists}
           onClose={() => setBookingModalOpen(false)}
           onCreated={handleAppointmentCreated}
+        />
+      )}
+
+      {/* Walk-In Intake Drawer (2-Step Flow) */}
+      {walkInSheetOpen && (
+        <WalkInSheet
+          selectedDate={selectedDate}
+          onClose={() => setWalkInSheetOpen(false)}
+          onComplete={(newWaitItem, newAppt) => {
+            if (newAppt) {
+              handleAppointmentCreated(newAppt)
+            } else {
+              loadData()
+            }
+            setWalkInSheetOpen(false)
+          }}
         />
       )}
     </div>

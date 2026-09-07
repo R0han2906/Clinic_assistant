@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from app.repositories.base import BaseClinicRepository
 from app.repositories.excel_repository import ExcelClinicRepository
-from app.models.availability import AvailableSlot
+from app.models.availability import AvailableSlot, WorkingScheduleItem
 from app.models.appointment import AppointmentStatus
 
 
@@ -96,7 +96,20 @@ class AvailabilityService:
             )
 
             if not day_schedule:
-                continue
+                # If dentist is active but has no custom schedule row for this day, use default operational hours
+                if day_of_week < 6:
+                    day_schedule = WorkingScheduleItem(
+                        availability_id=f"AV-DEF-{d.dentist_id}-{day_of_week}",
+                        dentist_id=d.dentist_id,
+                        day_of_week=day_of_week,
+                        start_time="09:00",
+                        end_time="17:00",
+                        break_start="12:00",
+                        break_end="13:00",
+                        is_working_day=True
+                    )
+                else:
+                    continue
 
             try:
                 start_dt = datetime.combine(

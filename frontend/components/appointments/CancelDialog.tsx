@@ -69,7 +69,7 @@ export function CancelDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-[460px] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in zoom-in-95">
         <header className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/20">
-          <h3 className="text-lg font-bold text-foreground">Cancel Appointment</h3>
+          <h3 className="text-lg font-bold text-foreground">Cancel / Delete Appointment</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted transition">
             <X className="size-5" />
           </button>
@@ -81,7 +81,9 @@ export function CancelDialog({
               <CheckCircle2 className="size-6" />
             </div>
             <h4 className="text-base font-bold text-foreground">Appointment Cancelled</h4>
-            <p className="text-xs text-muted-foreground">The calendar slot has been freed.</p>
+            <p className="text-xs text-muted-foreground">
+              The calendar slot is freed. The record is now archived in <strong>Log History</strong>.
+            </p>
           </div>
         ) : (
           <form onSubmit={handleCancel} className="p-6 space-y-4 text-sm">

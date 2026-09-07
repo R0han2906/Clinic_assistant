@@ -92,7 +92,13 @@ export function Header() {
       <div className="ml-auto flex items-center gap-3">
         {/* Quick Walk-In / Create button */}
         <button
-          onClick={() => router.push('/reservations?walkin=true')}
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/reservations')) {
+              window.dispatchEvent(new CustomEvent('open-walkin-sheet'))
+            } else {
+              router.push('/reservations?walkin=true')
+            }
+          }}
           className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 transition active:scale-95 cursor-pointer"
           aria-label="Quick Walk-In"
         >

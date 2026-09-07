@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date, time
 from decimal import Decimal
 from contextlib import contextmanager
+import re
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -454,16 +455,39 @@ class SupabaseClinicRepository(BaseClinicRepository):
             return [DentistResponse(**dict(r)) for r in rows]
 
     def get_dentist(self, dentist_id: str) -> Optional[DentistResponse]:
+        if not dentist_id:
+            return None
+        raw = str(dentist_id).strip()
+        raw_lower = raw.lower()
+
         alias_map = {
             "d1": "DOC-000001",
             "d2": "DOC-000002",
             "d3": "DOC-000003",
         }
-        target_id = alias_map.get(dentist_id.lower(), dentist_id)
+        target_id = alias_map.get(raw_lower, raw)
+
+        # Build candidate IDs to match both DEN- and DOC- prefixes as well as numeric variants
+        candidates = [raw, target_id]
+        m = re.search(r'(?:den|doc|d)?-?0*(\d+)$', raw_lower)
+        if m:
+            num = int(m.group(1))
+            candidates.extend([
+                f"DEN-{num:06d}",
+                f"DOC-{num:06d}",
+                f"DEN-{num}",
+                f"DOC-{num}",
+                f"d{num}"
+            ])
+        if raw_lower.startswith("doc-"):
+            candidates.append("DEN-" + raw[4:])
+        elif raw_lower.startswith("den-"):
+            candidates.append("DOC-" + raw[4:])
+
         with self.get_cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM dentists WHERE dentist_id ILIKE %s OR dentist_id ILIKE %s;",
-                (dentist_id, target_id)
+                "SELECT * FROM dentists WHERE dentist_id = ANY(%s) OR dentist_id ILIKE %s LIMIT 1;",
+                (candidates, raw)
             )
             row = cursor.fetchone()
             return DentistResponse(**dict(row)) if row else None
@@ -495,13 +519,31 @@ class SupabaseClinicRepository(BaseClinicRepository):
     # ── Schedules & Availability ──────────────────────────────────────────────
 
     def list_schedules_for_dentist(self, dentist_id: str) -> List[WorkingScheduleItem]:
+        target_doc = self.get_dentist(dentist_id)
+        effective_id = target_doc.dentist_id if target_doc else dentist_id
         with self.get_cursor() as cursor:
             cursor.execute(
                 "SELECT * FROM availability WHERE dentist_id = %s ORDER BY day_of_week ASC;",
-                (dentist_id,)
+                (effective_id,)
             )
             rows = cursor.fetchall()
-            return [WorkingScheduleItem(**dict(r)) for r in rows]
+            if rows:
+                return [WorkingScheduleItem(**dict(r)) for r in rows]
+            # Default working hours: Mon-Sat 09:00 - 17:00 (break 12:00-13:00), Sun off
+            defaults = []
+            for dow in range(7):
+                is_working = dow < 6
+                defaults.append(WorkingScheduleItem(
+                    availability_id=f"AV-DEF-{effective_id}-{dow}",
+                    dentist_id=effective_id,
+                    day_of_week=dow,
+                    start_time="09:00" if is_working else "00:00",
+                    end_time="17:00" if is_working else "00:00",
+                    break_start="12:00" if is_working else None,
+                    break_end="13:00" if is_working else None,
+                    is_working_day=is_working
+                ))
+            return defaults
 
     def update_schedule_for_day(
         self,
@@ -584,8 +626,10 @@ class SupabaseClinicRepository(BaseClinicRepository):
             query += " AND a.date = %s"
             params.append(date)
         if dentist_id:
+            target_doc = self.get_dentist(dentist_id)
+            effective_dentist_id = target_doc.dentist_id if target_doc else dentist_id
             query += " AND a.dentist_id = %s"
-            params.append(dentist_id)
+            params.append(effective_dentist_id)
         if patient_id:
             query += " AND a.patient_id = %s"
             params.append(patient_id)
@@ -610,6 +654,10 @@ class SupabaseClinicRepository(BaseClinicRepository):
             return AppointmentResponse(**dict(row)) if row else None
 
     def create_appointment(self, appointment_data: AppointmentCreate) -> AppointmentResponse:
+        # Resolve canonical dentist ID to guarantee foreign key integrity with dentists table
+        canonical_doc = self.get_dentist(appointment_data.dentist_id)
+        target_dentist_id = canonical_doc.dentist_id if canonical_doc else appointment_data.dentist_id
+
         with self.get_cursor(commit=True) as cursor:
             # Slot conflict check
             cursor.execute(
@@ -625,7 +673,7 @@ class SupabaseClinicRepository(BaseClinicRepository):
                   );
                 """,
                 (
-                    appointment_data.dentist_id,
+                    target_dentist_id,
                     appointment_data.date,
                     appointment_data.end_time,
                     appointment_data.start_time,
@@ -659,7 +707,7 @@ class SupabaseClinicRepository(BaseClinicRepository):
                 (
                     new_id,
                     appointment_data.patient_id,
-                    appointment_data.dentist_id,
+                    target_dentist_id,
                     appointment_data.date,
                     appointment_data.start_time,
                     appointment_data.end_time,
@@ -677,7 +725,9 @@ class SupabaseClinicRepository(BaseClinicRepository):
                 )
             )
             row = cursor.fetchone()
-            return AppointmentResponse(**dict(row))
+
+        enriched = self.get_appointment(new_id)
+        return enriched if enriched else AppointmentResponse(**dict(row))
 
     def update_appointment(self, appointment_id: str, updates: Dict[str, Any]) -> Optional[AppointmentResponse]:
         allowed_cols = {
@@ -741,7 +791,9 @@ class SupabaseClinicRepository(BaseClinicRepository):
         if not current:
             raise ResourceNotFoundError("Appointment", appointment_id)
 
-        dentist_id = new_dentist_id or current.dentist_id
+        raw_dentist_id = new_dentist_id or current.dentist_id
+        target_doc = self.get_dentist(raw_dentist_id)
+        dentist_id = target_doc.dentist_id if target_doc else raw_dentist_id
 
         with self.get_cursor(commit=True) as cursor:
             # Slot conflict check excluding current appointment
@@ -792,7 +844,9 @@ class SupabaseClinicRepository(BaseClinicRepository):
                 (new_date, new_start_time, new_end_time, dentist_id, notes, datetime.now(), appointment_id)
             )
             row = cursor.fetchone()
-            return AppointmentResponse(**dict(row)) if row else None
+        
+        enriched = self.get_appointment(appointment_id)
+        return enriched if enriched else (AppointmentResponse(**dict(row)) if row else None)
 
     # ── Treatments Catalog ───────────────────────────────────────────────────
 
