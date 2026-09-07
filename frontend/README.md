@@ -1,19 +1,20 @@
-# Zendenta Frontend — Clinic Receptionist Management Dashboard
+# Clinix Frontend — Clinic Receptionist Management Dashboard
 
-A modern, high-performance dental clinic management web application built with **Next.js 16 App Router (Turbopack)**, **Tailwind CSS v4**, and **TypeScript**. Built specifically for the **Clinic Receptionist** persona, Zendenta v3 streamlines patient check-ins, multi-dentist calendar scheduling, post-appointment billing, visit summaries, and queue management.
+A modern, high-performance dental clinic management web application built with **Next.js 16 App Router (Turbopack)**, **Tailwind CSS v4**, and **TypeScript**. Built specifically for the **Clinic Receptionist** persona, Clinix streamlines patient check-ins, multi-dentist calendar scheduling, post-appointment billing, visit summaries, and queue management.
 
 ---
 
-## 🌟 Key Features (Zendenta v3)
+## 🌟 Key Features (Clinix / Zendenta v3)
 
 - 📅 **Interactive Provider Calendar (`/reservations`)**
-  - Multi-dentist hourly view (9:00 AM – 5:00 PM) with dynamic provider columns directly fetched from the backend API.
-  - Native HTML5 date picker and date navigation controls for instant jumping across days.
-  - Bulletproof time parser supporting 24h (`09:00`), 12h (`09:00 AM`), and range strings with zero NaN positioning errors.
+  - Multi-dentist hourly view with dynamic provider columns directly fetched from the backend API (`DEN-000001` Dr. Sarah Wilson, `DEN-000002` Dr. Michael Chen, `DEN-000003` ROHAN).
+  - **Timezone-Safe Date Navigation**: Uses local calendar coordinates (`getLocalDateString()`), eliminating UTC day-shift drift across late-night/early-morning hours.
+  - **Bulletproof Time & Collision Engine (`lib/calendar-collision.ts`)**: Parses 24h (`09:00`), 12h (`09:00 AM`), and range strings (`"09:00 AM › 10:00 AM"`) with zero NaN positioning errors and accurate duration scaling.
+  - **Live Synchronization Bus**: Listens to and dispatches `'appointment-created'` and `'appointment-updated'` DOM events, instantly updating the calendar upon booking, walk-in intake, or status changes.
   - Comprehensive multi-identifier appointment matching (`dentist_id`, `dentistId`, `dentist_name`, `dentist`) ensuring all appointments are visible.
   - Drag-and-drop reschedule with automatic optimistic updates and backend persistence.
   - Deduplicated appointments with status-coded indicator badges (⏱ scheduled, ✓ checked-in, 🔵 in-progress, ✅ completed, 💰 paid).
-  - Quick Day/Week views and log history auditing.
+  - Direct-access operational mode: zero login friction for receptionists.
 - 🩺 **Receptionist-First Permissions & Lifecycle Drawer**
   - **Single Source of Truth**: 7-state appointment machine (`scheduled`, `checked-in`, `in-progress`, `completed`, `paid`, `cancelled`, `no-show`).
   - **Clinical Separation**: Removed dentist-only medical checkup editing in favor of read-only clinical summaries and receptionist administrative notes.
@@ -131,6 +132,7 @@ frontend/
 ├── lib/
 │   ├── api-client.ts                 # Type-safe API client with offline fallbacks
 │   ├── appointment-lifecycle.ts      # 7-state machine, transitions & action mapper
+│   ├── calendar-collision.ts         # Collision detection, time parsing, and slot stacking algorithms
 │   ├── constants.ts                  # Navigation configs & keyboard shortcuts
 │   ├── formatters.ts                 # Currency and duration formatters
 │   ├── mock-data.ts                  # Authoritative mock dataset for offline reliability

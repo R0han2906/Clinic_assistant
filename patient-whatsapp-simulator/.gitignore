@@ -11,7 +11,7 @@ dist/
 dist-ssr/
 build/
 
-# Environment Variables
+# Environment Variables (Strictly exclude all .env files)
 .env
 .env.*
 *.local
@@ -20,7 +20,11 @@ build/
 .env.test.local
 .env.production.local
 .env.example
+*.env
+*.env.*
 *.env.example
+*.tmp
+*.temp
 
 # Logs
 logs/

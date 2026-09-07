@@ -17,6 +17,7 @@ import {
   CALENDAR_END_HOUR,
   HOUR_HEIGHT_PX,
   computeCalendarLayout,
+  parseTimeToHour,
   PositionedAppointment,
 } from '@/lib/calendar-collision'
 
@@ -47,62 +48,36 @@ const CancelDialog = dynamic(
   { ssr: false }
 )
 
-// ─── Helper: Bulletproof Time Parser ──────────────────────────────────────────
+// ─── Helper: Timezone-Safe Local Date Formatter ───────────────────────────────
 
-function parseTimeToHour(timeStr?: string): number | undefined {
-  if (!timeStr) return undefined
-  const clean = String(timeStr).trim()
-
-  // Match 12-hour format e.g. "09:00 AM", "2:30 pm", "09:00AM"
-  const match12 = clean.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)/i)
-  if (match12) {
-    let h = parseInt(match12[1], 10)
-    const m = parseInt(match12[2], 10) || 0
-    const isPm = match12[3].toLowerCase() === 'pm'
-    if (isPm && h < 12) h += 12
-    if (!isPm && h === 12) h = 0
-    return h + m / 60
-  }
-
-  // Match range strings like "09:00 AM › 10:00 AM" or "09:00 - 10:00"
-  if (clean.includes('›') || clean.includes(' - ') || clean.includes('-')) {
-    const firstPart = clean.split(/[›\-]/)[0].trim()
-    const parsedFirst = parseTimeToHour(firstPart)
-    if (parsedFirst !== undefined) return parsedFirst
-  }
-
-  // Match 24-hour format HH:MM(:SS) e.g. "09:00", "14:30", "09:00:00"
-  const match24 = clean.match(/(\d{1,2}):(\d{2})/)
-  if (match24) {
-    const h = parseInt(match24[1], 10)
-    const m = parseInt(match24[2], 10) || 0
-    return h + m / 60
-  }
-
-  return undefined
+function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const DEFAULT_FALLBACK_DENTISTS = [
   {
-    id: 'DOC-000001',
-    dentist_id: 'DOC-000001',
-    name: 'Drg Soap Mactavish',
-    specialty: 'Chief Dentist & Orthodontics',
-    initials: 'SM',
+    id: 'DEN-000001',
+    dentist_id: 'DEN-000001',
+    name: 'Dr. Sarah Wilson',
+    specialty: 'General Dentistry',
+    initials: 'SW',
   },
   {
-    id: 'DOC-000002',
-    dentist_id: 'DOC-000002',
-    name: "Drg Jerald O'Hara",
-    specialty: 'Endodontist & Oral Surgery',
-    initials: 'JO',
+    id: 'DEN-000002',
+    dentist_id: 'DEN-000002',
+    name: 'Dr. Michael Chen',
+    specialty: 'Orthodontics',
+    initials: 'MC',
   },
   {
-    id: 'DOC-000003',
-    dentist_id: 'DOC-000003',
-    name: 'Drg Putri Larasati',
-    specialty: 'Pediatric & Restorative Dentistry',
-    initials: 'PL',
+    id: 'DEN-000003',
+    dentist_id: 'DEN-000003',
+    name: 'ROHAN',
+    specialty: 'General Dentistry',
+    initials: 'RO',
   },
 ]
 
@@ -440,6 +415,13 @@ interface CalendarGridProps {
   loading: boolean
 }
 
+function extractDoctorNumber(val?: string): string | null {
+  if (!val) return null
+  const m = String(val).match(/(?:den|doc|d)-?0*(\d+)/i)
+  if (m) return m[1]
+  return null
+}
+
 function matchAppointmentToDentist(appt: any, dentist: any, docId: string): boolean {
   const targetId = String(docId || '').toLowerCase()
   const dId = dentist.dentist_id ? String(dentist.dentist_id).toLowerCase() : ''
@@ -451,8 +433,16 @@ function matchAppointmentToDentist(appt: any, dentist: any, docId: string): bool
   const aDentistName = appt.dentist_name ? String(appt.dentist_name).trim().toLowerCase() : ''
   const aDentist = appt.dentist ? String(appt.dentist).trim().toLowerCase() : ''
 
+  // 1. Direct ID matches
   if (aDentistId && (aDentistId === targetId || aDentistId === dId || aDentistId === dLegacyId)) return true
   if (aDentistLegacyId && (aDentistLegacyId === targetId || aDentistLegacyId === dId || aDentistLegacyId === dLegacyId)) return true
+
+  // 2. Numeric doctor index matches (e.g. DOC-000001, DEN-000001, d1 => '1')
+  const aNum = extractDoctorNumber(aDentistId) || extractDoctorNumber(aDentistLegacyId)
+  const dNum = extractDoctorNumber(dId) || extractDoctorNumber(dLegacyId) || extractDoctorNumber(targetId)
+  if (aNum && dNum && aNum === dNum) return true
+
+  // 3. Name fuzzy matches
   if (aDentistName && dName && (aDentistName === dName || dName.includes(aDentistName) || aDentistName.includes(dName))) return true
   if (aDentist && dName && (aDentist === dName || dName.includes(aDentist) || aDentist.includes(dName))) return true
 
@@ -762,7 +752,7 @@ export function CalendarBoard({
   initialAppointments,
   initialDentists,
 }: CalendarBoardProps) {
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString())
   const [appointments, setAppointments] = useState<any[]>(initialAppointments)
   const [dentists, setDentists] = useState<any[]>(initialDentists)
   const [loading, setLoading] = useState(false)
@@ -793,22 +783,26 @@ export function CalendarBoard({
     setLoading(true)
     try {
       const [appts, dents] = await Promise.all([
-        api.appointments.list({ date: selectedDate }).catch(() => []),
-        api.dentists.list().catch(() => []),
+        api.appointments.list({ date: selectedDate }).catch((err) => {
+          console.warn('Error fetching appointments for date', selectedDate, err)
+          return null
+        }),
+        api.dentists.list().catch(() => null),
       ])
-      const seenIds = new Set<string>()
-      const uniqueAppts = (appts || []).filter((a: any) => {
-        const id = a.id || a.appointment_id
-        if (!id) return true
-        if (seenIds.has(id)) return false
-        seenIds.add(id)
-        return true
-      })
-      setAppointments(uniqueAppts)
+      if (appts !== null) {
+        const seenIds = new Set<string>()
+        const uniqueAppts = appts.filter((a: any) => {
+          const id = a.id || a.appointment_id
+          if (!id) return true
+          if (seenIds.has(id)) return false
+          seenIds.add(id)
+          return true
+        })
+        setAppointments(uniqueAppts)
+      }
       if (dents && dents.length > 0) setDentists(dents)
     } catch (err) {
       console.error('Failed to load reservations from backend:', err)
-      setAppointments([])
     } finally {
       setLoading(false)
     }
@@ -841,14 +835,22 @@ export function CalendarBoard({
         loadData()
       }
     }
+    const handleGlobalUpdated = () => {
+      loadData()
+    }
     window.addEventListener('appointment-created', handleGlobalCreated)
-    return () => window.removeEventListener('appointment-created', handleGlobalCreated)
+    window.addEventListener('appointment-updated', handleGlobalUpdated)
+    return () => {
+      window.removeEventListener('appointment-created', handleGlobalCreated)
+      window.removeEventListener('appointment-updated', handleGlobalUpdated)
+    }
   }, [selectedDate])
 
   const changeDateBy = (days: number) => {
-    const curr = new Date(selectedDate + 'T00:00:00')
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const curr = new Date(y, m - 1, d)
     curr.setDate(curr.getDate() + days)
-    setSelectedDate(curr.toISOString().split('T')[0])
+    setSelectedDate(getLocalDateString(curr))
   }
 
   const handleUpdateStatus = async (newStatus: AppointmentStatus) => {
@@ -867,6 +869,9 @@ export function CalendarBoard({
     if (apptId && !String(apptId).startsWith('temp-')) {
       try {
         await api.appointments.updateStatus(apptId, newStatus)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('appointment-updated', { detail: { id: apptId, status: newStatus } }))
+        }
         await loadData()
       } catch (err) {
         console.warn('Could not persist status transition to backend:', err)

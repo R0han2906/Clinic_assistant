@@ -106,6 +106,11 @@ Relevant Endpoints:
 - `POST /api/v1/appointments/{id}/cancel` — Cancel appointment with reason
 - `PATCH /api/v1/appointments/{id}/payment` — Settle billing (`paid`)
 
+### 🛡️ Resilient Serialization & Doctor Mapping
+- **Nullable Foreign Keys**: `AppointmentResponse` supports nullable `patient_id` and `dentist_id` to accommodate database `ON DELETE SET NULL` constraints without raising Pydantic validation errors.
+- **Datetime Normalization**: Automatically converts PostgreSQL timestamps and `datetime.date` objects into standard ISO-8601 strings.
+- **Canonical Provider Keys**: Bi-directional mapping between database doctor IDs (`DEN-000001` Dr. Sarah Wilson, `DEN-000002` Dr. Michael Chen, `DEN-000003` ROHAN) and shorthand aliases (`d1`, `d2`, `d3`).
+
 ---
 
 ## 🚀 Running the Backend Locally
@@ -122,8 +127,8 @@ Create `backend/.env`:
 STORAGE_BACKEND=supabase
 
 # Supabase Credentials (if using Supabase)
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.puhbtqisawianlqyivyj.supabase.co:5432/postgres
-SUPABASE_URL=https://puhbtqisawianlqyivyj.supabase.co
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@[YOUR-SUPABASE-HOST]:5432/postgres
+SUPABASE_URL=https://[YOUR-SUPABASE-PROJECT].supabase.co
 
 # API Configuration
 PORT=8000

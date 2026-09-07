@@ -120,14 +120,14 @@ class PaymentReminderResponse(BaseModel):
 
 class AppointmentResponse(BaseModel):
     appointment_id: str
-    patient_id: str
+    patient_id: Optional[str] = None
     patient_name: Optional[str] = None
     patient_phone: Optional[str] = None
-    dentist_id: str
+    dentist_id: Optional[str] = None
     dentist_name: Optional[str] = None
     date: str
-    start_time: str
-    end_time: str
+    start_time: Optional[str] = "09:00"
+    end_time: Optional[str] = "10:00"
     treatment_name: Optional[str] = "General Checkup"
     source: Optional[str] = "MANUAL APPOINTMENT"
     payment_status: Optional[str] = "UNPAID"
@@ -138,8 +138,17 @@ class AppointmentResponse(BaseModel):
     notes: Optional[str] = None
     booking_time: Optional[str] = None
     visit_summary: Optional[Dict[str, Any]] = None
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    @field_validator("date", "created_at", "updated_at", "booking_time", mode="before")
+    @classmethod
+    def validate_datetimes_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v)
 
     @field_validator("status", mode="before")
     @classmethod

@@ -73,3 +73,11 @@ No Excel storage is used in production. All clinic operations (patients, appoint
 - **Sequential IDs:** Human-readable sequential primary keys (`PAT-000001`, `APT-000001`, `SAL-000001`, `INV-000001`, `PO-000001`, `STF-000001`) preserve clinic record consistency.
 - **CORS Configuration:** Configured to accept requests from `localhost:3000` (staff frontend) and `localhost:5173` (patient simulator).
 - **On-Demand Exports:** Staff can download current CSV dumps of any entity via `/api/v1/export/*` without writing files to disk.
+
+---
+
+## 4. Operational Modes & Real-Time Synchronization
+
+- **Direct-Access Front-Desk Mode:** Authentication is currently bypassed for receptionist and practitioner workflows, allowing front-desk staff immediate access to scheduling, check-in queue management, and checkout billing without authentication barriers.
+- **Client-Side Live Event Bus:** The frontend dispatches custom window events (`'appointment-created'`, `'appointment-updated'`) across modal drawers (`WalkInSheet`, `ReservationDrawer`, `RescheduleDialog`, `TakePaymentDialog`) and `CalendarBoard.tsx` to automatically refetch slot allocations without full page reloads.
+- **Schema Resiliency:** The FastAPI backend domain layer serializes nullable foreign key associations (`patient_id`, `dentist_id`) via Pydantic pre-validators, maintaining continuous service even under cascade events (`ON DELETE SET NULL`).

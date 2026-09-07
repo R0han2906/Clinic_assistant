@@ -1,28 +1,28 @@
-# Zendenta Frontend — Architecture, Context & Component Guide
+# Clinix Frontend — Architecture, Context & Component Guide
 
-> **Project:** Zendenta — Receptionist-First Dental Clinic Management System  
+> **Project:** Clinix (Avicena Clinic) / Zendenta — Receptionist-First Dental Clinic Management System  
 > **Target User:** Clinic receptionists (scheduling, check-ins, queue management, billing)  
 > **Architecture:** Next.js 16 App Router (Turbopack) + Tailwind CSS v4 + TypeScript  
-> **Status:** Zendenta v3 Receptionist-First Upgrade Complete  
+> **Status:** Receptionist-First Upgrade & Calendar Synchronization Engine Complete  
 > **Last Updated:** September 2026
 
 ---
 
 ## 1. Executive Summary & Zendenta v3 Upgrade
 
-Zendenta v3 aligns the clinic management dashboard with the **Clinic Receptionist** persona. The receptionist is the front-desk orchestrator responsible for intake, scheduling, queue monitoring, and billing. Clinical examinations and medical checkup modifications are separated from the receptionist's permissions.
+Clinix aligns the clinic management dashboard with the **Clinic Receptionist** persona. The receptionist is the front-desk orchestrator responsible for intake, scheduling, queue monitoring, and billing. Clinical examinations and medical checkup modifications are separated from the receptionist's permissions.
 
-### Core Upgrades in Zendenta v3:
+### Core Upgrades in Zendenta v3 & Clinix:
 1. **Next.js 16 Server vs. Client Component Discipline**:
    - `app/reservations/page.tsx` and `app/patients/page.tsx` are static **Server Components** rendering interactive Client Component shells (`CalendarBoard.tsx` and `PatientsDirectory.tsx`).
    - Extracted `PatientRow.tsx` and `PatientAvatar.tsx` as Client Components to prevent Server Component `<img onError>` runtime errors.
 2. **7-State Appointment Lifecycle Engine** (`lib/appointment-lifecycle.ts`):
    - Strict state transitions: `scheduled` → `checked-in` → `in-progress` → `completed` → `paid` (plus `cancelled` & `no-show` rebook paths).
    - Receptionist actions mapped directly to appointment status.
-3. **Receptionist Role Permissions**:
+3. **Receptionist Role Permissions & Direct Access**:
    - Replaced dentist-only *"Edit Medical Checkup"* with read-only *"View Visit Summary"* (`VisitSummaryPanel.tsx`), *"Receptionist Admin Notes"*, and *"View Medical Records"*.
    - User profile badge in header identifies user as `Darrell Steward · Receptionist`.
-   - Reports partitioned into accessible Operational Reports and restricted `[Admin Only]` Financial Reports.
+   - Direct-access operational mode: zero login friction for receptionists.
 4. **Interactive Dialogs (`next/dynamic` with `{ ssr: false }`)**:
    - **Take Payment Dialog** (`TakePaymentDialog.tsx`): 480px modal for recording payments and transitioning status to `paid`.
    - **Visit Summary Panel** (`VisitSummaryPanel.tsx`): Read-only chief complaint, diagnosis, prescriptions, and billing.
@@ -40,6 +40,11 @@ Zendenta v3 aligns the clinic management dashboard with the **Clinic Receptionis
    - Built-in HTML5 drag-and-drop on `CalendarBoard.tsx`.
    - Cards are draggable with duration preservation; dentist hour slots serve as drop targets with highlighted dropzones (`bg-primary/20 border-dashed`).
    - Persists automatically via `POST /api/v1/appointments/{id}/reschedule` with optimistic updates and conflict rollback.
+8. **Timezone-Safe Date Coordinates & Real-Time Event Bus**:
+   - `getLocalDateString()` replaces UTC string conversion, guaranteeing queried appointments match the clinic's local day without day-shift artifacts.
+   - Custom window event listeners (`'appointment-created'`, `'appointment-updated'`) trigger live calendar refresh cycles upon modal submission without page reloads.
+9. **Bulletproof Collision & Time Engine (`lib/calendar-collision.ts`)**:
+   - Upgraded `parseTimeToHour` parses 12-hour AM/PM (`09:00 AM`), 24-hour formats (`14:30`), and composite range strings (`"09:00 AM › 10:00 AM"`), calculating visual offsets and card heights with zero NaN collapse.
 
 ---
 
@@ -116,6 +121,7 @@ frontend/
 ├── lib/
 │   ├── api-client.ts                 # Type-safe API client with graceful offline fallbacks
 │   ├── appointment-lifecycle.ts      # 7-state machine, allowed transitions & action mapper
+│   ├── calendar-collision.ts         # Collision detection, time parsing, and slot stacking algorithms
 │   ├── constants.ts                  # Navigation configs & keyboard shortcuts
 │   ├── formatters.ts                 # Currency and duration formatters
 │   ├── mock-data.ts                  # Authoritative dataset for offline reliability

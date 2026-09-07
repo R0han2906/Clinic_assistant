@@ -14,7 +14,7 @@ dist/
 .turbo/
 *.tsbuildinfo
 
-# Environment & Secrets
+# Environment & Secrets (Strictly exclude all .env files)
 .env
 .env.*
 .env*.local
@@ -23,7 +23,11 @@ dist/
 .env.test.local
 .env.production.local
 .env.example
+*.env
+*.env.*
 *.env.example
+*.tmp
+*.temp
 
 # Logs
 logs/

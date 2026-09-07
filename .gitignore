@@ -9,11 +9,14 @@ imp
 temp/
 .serena/
 
-# Environment and Secret Files
+# Environment and Secret Files (Strictly exclude all .env files)
 .env
 .env.*
 .env*.local
+.env.local
 .env.example
+*.env
+*.env.*
 *.env.example
 *.key
 *.pem
@@ -53,6 +56,12 @@ coverage.xml
 *.cover
 *.log
 
+# Temporary & Scratch Files
+*.tmp
+*.temp
+backend/data/*.tmp
+backend/data/*.temp
+
 # Virtual Environments
 venv/
 .venv/
@@ -68,6 +77,7 @@ backend/data/*.lock
 *.lock
 !package-lock.json
 !pnpm-lock.yaml
+!yarn.lock
 
 # OS and Editor
 .DS_Store
@@ -86,3 +96,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+*.bak

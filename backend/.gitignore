@@ -8,10 +8,14 @@ __pycache__/
 *$py.class
 *.pyd
 
-# Environments
+# Environments (Strictly exclude all .env files)
 .env
 .env.*
+.env*.local
+.env.local
 .env.example
+*.env
+*.env.*
 *.env.example
 venv/
 .venv/
@@ -29,10 +33,14 @@ nosetests.xml
 coverage.xml
 *.cover
 
-# Data, Backups & Lockfiles
+# Data, Backups, Temp & Lockfiles
 data/backups/
 data/*.xlsx.lock
 data/*.lock
+data/*.tmp
+data/*.temp
+*.tmp
+*.temp
 *.lock
 
 # Logs

@@ -3,12 +3,12 @@
 ## 1. Scope Rules
 
 1. **Dentist-clinic scope:** The product is designed specifically for a dental clinic, not a general hospital.
-2. **Release definition:** The initial release consists of the dental clinic staff website and a **Patient Request Simulator**, powered by a FastAPI backend and temporary Excel pilot storage.
+2. **Release definition:** The ecosystem consists of the Clinix dental clinic staff website and a **Patient Request Simulator**, powered by a FastAPI backend and dual-storage repository (Supabase PostgreSQL + Excel fallback).
 3. **Simulator-first patient input:** Because no dedicated business WhatsApp number is currently available, the Patient Request Simulator is used to imitate patient interactions. No live WhatsApp number or account is required for the initial iteration.
 4. **WhatsApp is a later phase:** WhatsApp integration will be added only after the staff workflow and booking rules are proven.
-5. **Supabase is deferred:** Supabase (or PostgreSQL) will be introduced only after pilot validation when concurrency, scaling, or production WhatsApp traffic justifies it.
-6. **Excel is temporary:** Excel is a temporary pilot storage mechanism, never the final production database.
-7. **Single clinic pilot:** Start with one dental clinic and one controlled workbook (`clinic_data.xlsx`).
+5. **Dual-Repository (Supabase PostgreSQL primary + Excel fallback):** The system operates with Supabase PostgreSQL (17 normalized tables with connection pooling) as the primary storage engine (`STORAGE_BACKEND=supabase`), with the 12-sheet Excel engine retained as pilot fallback.
+6. **Excel is fallback:** Excel is a portable pilot storage mechanism, while Supabase provides transactional production persistence.
+7. **Single clinic pilot:** Start with one dental clinic (Avicena Clinic) and expandable provider roster (`DEN-000001` Dr. Sarah Wilson, `DEN-000002` Dr. Michael Chen, `DEN-000003` ROHAN).
 8. **Administrative only:** The system is purely administrative. It must never provide clinical advice, medical diagnoses, triage, or prescriptions.
 
 ## 2. Excel Pilot Rules
@@ -41,7 +41,7 @@
 
 ## 5. Website & Simulator Rules
 
-1. **Authenticated staff access:** The staff website requires authentication before viewing or modifying clinic data.
+1. **Direct-access front-desk mode (Auth deferred):** To maximize speed and throughput for clinic receptionists and practitioners during operational pilots, authentication is bypassed/deferred. Staff access the dashboard directly without login barriers.
 2. **Clear appointment states:** Display explicit appointment statuses (`confirmed`, `pending`, `cancelled`, `rescheduled`, `completed`, `no_show`).
 3. **Actionable error messages:** If an operation fails (e.g., workbook lock timeout or write error), present an understandable error message to staff and preserve entered form data for retry.
 4. **Simulator separation:** The Patient Request Simulator must operate as a distinct test interface that sends standard HTTP requests to FastAPI, mirroring the future WhatsApp adapter payload.
