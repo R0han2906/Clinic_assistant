@@ -62,21 +62,29 @@ export interface WaitingPatient {
 
 export interface Appointment {
   id: string
+  appointment_id?: string
   patient: string
+  patient_name?: string
   patientId: string
   time: string
+  start_time?: string
+  end_time?: string
   startHour: number
   durationHours: number
   treatment: string
+  treatment_name?: string
   status: AppointmentStatus
   color: AppointmentColor
   dentist: string
+  dentist_name?: string
   dentistId: string
+  dentist_id?: string
   notes?: string
   patientPhone?: string
   patientEmail?: string
   patientAge?: number
   billNumber?: string
+  payment_status?: string
   visitSummary?: VisitSummary
 }
 
@@ -190,7 +198,7 @@ export interface NavItem {
   icon: string
   label: string
   href: string
-  badge?: number
+  badge?: number | string
 }
 
 export interface NavSection {

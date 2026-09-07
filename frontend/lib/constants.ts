@@ -4,7 +4,7 @@ import type { NavSection } from '@/types'
 
 export const navConfig: NavSection[] = [
   {
-    section: 'CLINIC',
+    section: 'CLINICAL',
     items: [
       { icon: 'LayoutDashboard', label: 'Dashboard',    href: '/dashboard' },
       { icon: 'CalendarCheck',   label: 'Reservations', href: '/reservations', badge: 16 },
@@ -14,26 +14,18 @@ export const navConfig: NavSection[] = [
     ],
   },
   {
-    section: 'FINANCE',
+    section: 'MANAGEMENT',
     items: [
-      { icon: 'Wallet',       label: 'Accounts',        href: '/accounts' },
-      { icon: 'TrendingUp',   label: 'Sales',           href: '/sales' },
-      { icon: 'ShoppingCart', label: 'Purchases',       href: '/purchases' },
-      { icon: 'CreditCard',   label: 'Payment Method',  href: '/payment-methods' },
+      { icon: 'Wallet',       label: 'Financials',  href: '/financials' },
+      { icon: 'Package',      label: 'Inventory',   href: '/inventory', badge: '6 Low' },
+      { icon: 'ShoppingCart', label: 'Purchases',   href: '/purchases' },
     ],
   },
   {
-    section: 'PHYSICAL ASSET',
+    section: 'INSIGHTS',
     items: [
-      { icon: 'Package', label: 'Stocks',      href: '/stocks' },
-      { icon: 'Monitor', label: 'Peripherals', href: '/peripherals' },
-    ],
-  },
-  {
-    section: null,
-    items: [
-      { icon: 'BarChart3',  label: 'Report',           href: '/reports' },
-      { icon: 'Headphones', label: 'Customer Support', href: '/support' },
+      { icon: 'BarChart3',  label: 'Reports & Analytics', href: '/reports' },
+      { icon: 'Headphones', label: 'Customer Support',   href: '/support' },
     ],
   },
 ]

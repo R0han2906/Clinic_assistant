@@ -81,8 +81,8 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
           dents.map((d) =>
             api.dentists
               .getSlots(todayStr, d.dentist_id, 30)
-              .then((slots) => [d.dentist_id, (slots || []).filter((s) => s.is_available !== false)] as const)
-              .catch(() => [d.dentist_id, []] as const)
+              .then((slots) => [d.dentist_id, (slots || []).filter((s) => s.is_available !== false) as SlotResponse[]] as const)
+              .catch(() => [d.dentist_id, [] as SlotResponse[]] as const)
           )
         ).then((pairs) => {
           const next: Record<string, SlotResponse[]> = {}
@@ -104,7 +104,7 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
       if (pats && pats.length > 0) {
         setPatientsList(pats)
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   const commonTreatments = [
@@ -181,7 +181,7 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
     const endTimeStr = `${endH}:${startM}`
 
     try {
-      await api.appointments.create({
+      const createdAppt: any = await api.appointments.create({
         patient_id: patientId,
         dentist_id: selectedDentist.id,
         date: todayStr,
@@ -193,6 +193,21 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
         reason: selectedTreatment.includes('Emergency') ? 'Emergency Walk-In' : 'Walk-In Intake',
         payment_status: 'UNPAID',
       })
+
+      const enrichedAppt = {
+        ...createdAppt,
+        patient_name: createdAppt?.patient_name || finalPatientName,
+        patient: createdAppt?.patient || finalPatientName,
+        dentist_name: createdAppt?.dentist_name || selectedDentist.name,
+        dentist: createdAppt?.dentist || selectedDentist.name,
+        treatment_name: createdAppt?.treatment_name || selectedTreatment,
+        treatment: createdAppt?.treatment || selectedTreatment,
+        status: createdAppt?.status || 'checked-in',
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('appointment-created', { detail: enrichedAppt }))
+      }
     } catch (err) {
       console.warn('Could not persist walk-in appointment to backend:', err)
     }
@@ -238,9 +253,8 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
           {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
-              className={`h-1.5 transition-colors ${
-                s <= step ? 'bg-primary' : 'bg-muted'
-              }`}
+              className={`h-1.5 transition-colors ${s <= step ? 'bg-primary' : 'bg-muted'
+                }`}
             />
           ))}
         </div>
@@ -288,11 +302,10 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
                         key={p.id}
                         type="button"
                         onClick={() => setSelectedPatient({ id: p.id, name: p.name, phone: p.phone })}
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition ${
-                          selectedPatient?.id === p.id
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition ${selectedPatient?.id === p.id
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border bg-card hover:bg-muted'
-                        }`}
+                          }`}
                       >
                         <div>
                           <p className="font-semibold text-xs text-foreground">{p.name}</p>
@@ -386,11 +399,10 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
                         nextSlot: d.nextSlot,
                       })
                     }
-                    className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition ${
-                      selectedDentist.id === d.id
+                    className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition ${selectedDentist.id === d.id
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-card hover:bg-muted'
-                    }`}
+                      }`}
                   >
                     <div>
                       <p className="font-bold text-xs text-foreground">{d.name}</p>
@@ -425,11 +437,10 @@ export function WalkInSheet({ onClose, onComplete }: WalkInSheetProps) {
                     key={trt}
                     type="button"
                     onClick={() => setSelectedTreatment(trt)}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border text-xs font-semibold transition ${
-                      selectedTreatment === trt
+                    className={`flex items-center justify-between p-3.5 rounded-xl border text-xs font-semibold transition ${selectedTreatment === trt
                         ? 'border-primary bg-primary/10 text-primary shadow-sm'
                         : 'border-border bg-card text-foreground hover:bg-muted'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <Stethoscope className="size-4 shrink-0 text-muted-foreground" />

@@ -22,13 +22,7 @@ import {
 import { PatientAvatar } from '@/components/patients/PatientAvatar'
 import { DashboardQuickActions } from '@/components/dashboard/DashboardQuickActions'
 
-const WalkInSheet = dynamic(
-  () =>
-    import('@/components/appointments/WalkInSheet').then(
-      (m) => m.WalkInSheet
-    ),
-  { ssr: false }
-)
+
 
 export default function DashboardPage() {
   const [appointments, setAppointments] = useState<any[]>([])
@@ -37,7 +31,7 @@ export default function DashboardPage() {
   const [requests, setRequests] = useState<PatientRequestResponse[]>([])
   const [waitingList, setWaitingList] = useState<WaitingPatient[]>([])
   const [toastMsg, setToastMsg] = useState<string | null>(null)
-  const [walkInOpen, setWalkInOpen] = useState(false)
+
 
   const todayStr = new Date().toISOString().split('T')[0]
 
@@ -49,10 +43,10 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       const [appts, dents, summary, reqs] = await Promise.all([
-        api.appointments.list({ date: todayStr }),
-        api.dentists.list(),
-        api.sales.summary(),
-        api.patientRequests.list()
+        api.appointments.list({ date: todayStr }).catch(() => []),
+        api.dentists.list().catch(() => []),
+        api.sales.summary().catch(() => null),
+        api.patientRequests.list().catch(() => [])
       ])
 
       const seenIds = new Set<string>()
@@ -118,6 +112,12 @@ export default function DashboardPage() {
             a.dentist ||
             'Assigned Dentist',
 
+          dentistId:
+            a.dentist_id ||
+            a.dentistId ||
+            'doc-fallback',
+
+
           treatment:
             a.treatment_name ||
             a.treatment ||
@@ -140,6 +140,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData()
+  }, [todayStr])
+
+  useEffect(() => {
+    const handleGlobalCreated = () => {
+      loadDashboardData()
+    }
+    window.addEventListener('appointment-created', handleGlobalCreated)
+    return () => window.removeEventListener('appointment-created', handleGlobalCreated)
   }, [todayStr])
 
   // Up Next Card:
@@ -276,14 +284,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setWalkInOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98] shadow-sm cursor-pointer"
-          >
-            <Plus className="size-4" />
-            Walk-In Intake
-          </button>
-
           <Link
             href="/reservations"
             className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground transition hover:opacity-90 active:scale-[0.98] shadow-sm"
@@ -555,9 +555,7 @@ export default function DashboardPage() {
 
             {waitingList.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground">
-                Lobby is currently clear. Use
-                &quot;Walk-In Intake&quot; above to register
-                new arrivals.
+                Lobby is currently clear. No patients waiting.
               </div>
             ) : (
               <div className="space-y-3">
@@ -764,22 +762,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Walk-In Intake Sheet */}
-      {walkInOpen && (
-        <WalkInSheet
-          onClose={() => setWalkInOpen(false)}
-          onComplete={(newPatient) => {
-            setWaitingList((prev) => [
-              newPatient,
-              ...prev
-            ])
 
-            showToast(
-              `✓ Walk-in patient ${newPatient.patientName} added to waiting queue`
-            )
-          }}
-        />
-      )}
     </div>
   )
 }

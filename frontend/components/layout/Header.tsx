@@ -1,15 +1,13 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
-import {
-  Menu, Search, Plus, CircleHelp, Activity, Settings, ChevronDown,
-} from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { Menu, Plus, MapPin } from 'lucide-react'
 import { useSidebarStore } from '@/store/sidebar.store'
 import { SidebarToggle } from '@/components/layout/Sidebar'
 import { navConfig } from '@/lib/constants'
-
-// ─── Derive page title from current path ─────────────────────────────────────
+import { MyAccountMenu } from '@/components/layout/MyAccountMenu'
+import { defaultClinicConfig } from '@/lib/clinic-config'
 
 function usePageTitle(): string {
   const pathname = usePathname()
@@ -22,13 +20,12 @@ function usePageTitle(): string {
   return match?.label ?? 'Dashboard'
 }
 
-// ─── Header Component ─────────────────────────────────────────────────────────
-
 export function Header() {
+  const router = useRouter()
   const { openMobile } = useSidebarStore()
   const title = usePageTitle()
+  const [showLocationPopover, setShowLocationPopover] = useState(false)
 
-  // Global keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey
@@ -36,17 +33,13 @@ export function Header() {
         e.preventDefault()
         useSidebarStore.getState().toggle()
       }
-      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
-        e.preventDefault()
-        document.getElementById('header-search')?.focus()
-      }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
 
   return (
-    <header className="flex h-[82px] shrink-0 items-center gap-4 border-b border-border bg-card px-5 lg:px-8">
+    <header className="flex h-[82px] shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-5 lg:px-8">
       {/* Mobile menu button */}
       <button
         onClick={openMobile}
@@ -56,54 +49,61 @@ export function Header() {
         <Menu />
       </button>
 
-      {/* Sidebar toggle (desktop) + Page title */}
+      {/* Sidebar toggle + Page title + Location Capsule */}
       <div className="flex items-center gap-3">
         <SidebarToggle />
-        <h1 className="text-[25px] font-bold tracking-tight">{title}</h1>
+        <h1 className="text-[23px] font-bold tracking-tight text-foreground">{title}</h1>
+
+        {/* Location & Status Capsule */}
+        <div className="relative hidden md:block">
+          <button
+            onClick={() => setShowLocationPopover(!showLocationPopover)}
+            className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+          >
+            <MapPin className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Main Center</span>
+            <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Open · 9AM - 12AM
+            </span>
+          </button>
+
+          {/* Location Popover */}
+          {showLocationPopover && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowLocationPopover(false)} />
+              <div className="absolute left-0 top-9 z-40 w-72 rounded-2xl border border-border bg-card p-4 shadow-xl text-xs space-y-2">
+                <h4 className="font-bold text-foreground">{defaultClinicConfig.name}</h4>
+                <p className="text-muted-foreground">{defaultClinicConfig.address.suite}</p>
+                <p className="text-muted-foreground">{defaultClinicConfig.address.street}, {defaultClinicConfig.address.city}</p>
+                <div className="pt-2 border-t border-border flex justify-between text-sky-600 font-semibold">
+                  <span>{defaultClinicConfig.contact.phone}</span>
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent(defaultClinicConfig.name)}`} target="_blank" rel="noreferrer" className="hover:underline">
+                    Google Maps →
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Right controls */}
       <div className="ml-auto flex items-center gap-3">
-        {/* Search */}
-        <label className="hidden h-11 w-[280px] cursor-text items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 text-muted-foreground xl:flex">
-          <Search className="size-5 shrink-0" />
-          <input
-            id="header-search"
-            className="w-full bg-transparent text-sm outline-none"
-            placeholder="Search for anything here…"
-          />
-        </label>
-
-        {/* New / Create button */}
+        {/* Quick Walk-In / Create button */}
         <button
-          className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 active:scale-[0.98]"
-          aria-label="Create"
+          onClick={() => router.push('/reservations?walkin=true')}
+          className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 transition active:scale-95 cursor-pointer"
+          aria-label="Quick Walk-In"
         >
-          <Plus />
+          <Plus className="size-4" />
+          <span className="hidden sm:inline">Walk-In</span>
         </button>
 
-        <button className="hidden rounded-full p-2 text-muted-foreground hover:bg-muted sm:block" aria-label="Help">
-          <CircleHelp />
-        </button>
-        <button className="hidden rounded-full p-2 text-muted-foreground hover:bg-muted md:block" aria-label="Activity">
-          <Activity />
-        </button>
-        <button className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Settings">
-          <Settings />
-        </button>
-
-        {/* User profile */}
-        <div className="hidden items-center gap-3 border-l border-border pl-4 md:flex">
-          <div className="flex size-9 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-primary">
-            DS
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Darrell Steward</p>
-            <p className="text-xs font-medium text-primary">Receptionist</p>
-          </div>
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </div>
+        {/* My Account Staff Hub Dropdown */}
+        <MyAccountMenu />
       </div>
     </header>
   )
 }
+

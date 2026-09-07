@@ -13,6 +13,8 @@ import { navConfig } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
+import { ClinicLogo } from '@/components/brand/ClinicLogo'
+
 // ─── Icon Map ────────────────────────────────────────────────────────────────
 
 const iconMap: Record<string, LucideIcon> = {
@@ -54,23 +56,10 @@ export function Sidebar() {
       <div
         className={cn(
           'flex h-[92px] shrink-0 items-center border-b border-border/60',
-          isCollapsed ? 'justify-center px-0' : 'gap-3 px-7'
+          isCollapsed ? 'justify-center px-0' : 'px-6'
         )}
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-5">
-            <path
-              d="M12 2.5C7.5 2.5 4 5 4 9C4 12 5 14.5 6 17.5C7 20.5 8.5 22 10 22C11 22 11.5 20.5 12 18.5C12.5 20.5 13 22 14 22C15.5 22 17 20.5 18 17.5C19 14.5 20 12 20 9C20 5 16.5 2.5 12 2.5Z"
-              fill="currentColor"
-            />
-            <circle cx="9" cy="8" r="1.5" fill="white" opacity="0.8" />
-          </svg>
-        </div>
-        {!isCollapsed && (
-          <span className="whitespace-nowrap text-[23px] font-bold tracking-tight text-foreground">
-            Clinix
-          </span>
-        )}
+        <ClinicLogo variant={isCollapsed ? 'icon-only' : 'full'} />
       </div>
 
       {/* Clinic Card */}
