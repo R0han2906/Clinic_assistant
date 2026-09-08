@@ -13,6 +13,7 @@ export type StepState =
   | 'select_dentist'
   | 'select_date'
   | 'select_time_range'
+  | 'slot_alternatives'
   | 'review'
   | 'confirmed'
   | 'human_handoff'
@@ -49,6 +50,14 @@ export interface TimeSlot {
   unavailableReason?: string;
 }
 
+export interface AlternativeSlot {
+  type: 'same_doc' | 'same_time_colleague' | 'alternate_daypart';
+  label: string;
+  slot: TimeSlot;
+  dentistName: string;
+  score: number;
+}
+
 export interface Treatment {
   id: string;
   name: string;
@@ -80,6 +89,20 @@ export interface AppointmentRequest {
   createdTimestamp: string;
 }
 
+export interface UpcomingBookingItem {
+  referenceCode: string; // APT-XXXXXX or REQ-XXXXXX
+  type: 'appointment' | 'request';
+  dentistId?: string;
+  dentistName: string;
+  date: string;
+  time: string; // "10:00 – 10:30" or "10:00"
+  startTime?: string;
+  endTime?: string;
+  status?: string; // 'scheduled', 'confirmed', 'pending', 'cancelled'
+  reason?: string;
+  notes?: string;
+}
+
 export interface ExistingPatientRecord {
   patientId: string;
   fullName: string;
@@ -89,11 +112,6 @@ export interface ExistingPatientRecord {
   emergencyContact?: string;
   lastVisitDate: string;
   lastVisitType: string;
-  upcomingAppointment?: {
-    referenceCode: string;
-    dentistName: string;
-    date: string;
-    time: string;
-    status?: string; // 'confirmed', 'pending', 'cancelled'
-  };
+  upcomingAppointments: UpcomingBookingItem[];
+  upcomingAppointment?: UpcomingBookingItem;
 }

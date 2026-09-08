@@ -1,12 +1,13 @@
 import React from 'react';
-import type { Dentist, PatientDetails, TimeSlot } from '../types';
-import { User, Calendar, Clock, Stethoscope, CheckCircle, Edit3, XCircle, FileText } from 'lucide-react';
+import type { Dentist, PatientDetails, TimeSlot, UpcomingBookingItem } from '../types';
+import { User, Calendar, Clock, Stethoscope, CheckCircle, Edit3, XCircle, FileText, RefreshCw } from 'lucide-react';
 
 interface ReviewCardProps {
   patient: PatientDetails;
   dentist: Dentist;
   dateLabel: string;
   slot: TimeSlot;
+  reschedulingAppointment?: UpcomingBookingItem | null;
   onConfirm: () => void;
   onChangeDetails: () => void;
   onCancel: () => void;
@@ -18,20 +19,53 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({
   dentist,
   dateLabel,
   slot,
+  reschedulingAppointment,
   onConfirm,
   onChangeDetails,
   onCancel,
   disabled = false,
 }) => {
+  const isReschedule = Boolean(reschedulingAppointment);
+
   return (
     <div className="review-summary-card">
       <div className="review-card-header">
-        <CheckCircle className="header-check-icon" size={20} />
+        {isReschedule ? (
+          <RefreshCw className="header-check-icon" size={20} />
+        ) : (
+          <CheckCircle className="header-check-icon" size={20} />
+        )}
         <div>
-          <h3 className="review-title">Review Appointment Request</h3>
-          <p className="review-subtitle">Please verify your details before submitting</p>
+          <h3 className="review-title">
+            {isReschedule ? 'Review Rescheduled Appointment' : 'Review Appointment Request'}
+          </h3>
+          <p className="review-subtitle">
+            {isReschedule
+              ? 'Please verify your new rescheduled slot before confirming'
+              : 'Please verify your details before submitting'}
+          </p>
         </div>
       </div>
+
+      {isReschedule && reschedulingAppointment && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: 8,
+          padding: 10,
+          marginBottom: 12,
+          fontSize: 12,
+          color: '#1e40af'
+        }}>
+          <p style={{ margin: '0 0 4px 0', fontWeight: 600 }}>
+            🔄 Rescheduling Appointment: <code>{reschedulingAppointment.referenceCode}</code>
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: 11 }}>
+            <span><strong>Previous:</strong> {reschedulingAppointment.date} at {reschedulingAppointment.time}</span>
+            <span><strong>Doctor:</strong> {reschedulingAppointment.dentistName}</span>
+          </div>
+        </div>
+      )}
 
       <div className="review-details-grid">
         <div className="review-item">
@@ -85,7 +119,15 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({
           disabled={disabled}
           className="review-btn btn-confirm"
         >
-          <CheckCircle size={16} /> Confirm Request
+          {isReschedule ? (
+            <>
+              <RefreshCw size={16} /> Confirm Reschedule
+            </>
+          ) : (
+            <>
+              <CheckCircle size={16} /> Confirm Request
+            </>
+          )}
         </button>
 
         <button

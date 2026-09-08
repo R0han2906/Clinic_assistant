@@ -62,8 +62,17 @@ class PatientRequestService:
 
         return self.repository.create_patient_request(request_data)
 
-    def list_requests(self, status: Optional[str] = None) -> List[PatientRequestResponse]:
-        return self.repository.list_patient_requests(status=status)
+    def list_requests(
+        self,
+        status: Optional[str] = None,
+        patient_phone: Optional[str] = None,
+        patient_id: Optional[str] = None
+    ) -> List[PatientRequestResponse]:
+        return self.repository.list_patient_requests(
+            status=status,
+            patient_phone=patient_phone,
+            patient_id=patient_id
+        )
 
     def get_request(self, request_id: str) -> PatientRequestResponse:
         req = self.repository.get_patient_request(request_id)
@@ -99,15 +108,19 @@ class PatientRequestService:
                 ))
                 patient_id = new_pat.patient_id
 
+        canonical_doc = self.repository.get_dentist(req.dentist_id)
+        target_dentist_id = canonical_doc.dentist_id if canonical_doc else req.dentist_id
+
         # Book the official appointment
+        raw_source = str(req.source or "WHATSAPP").upper()
         apt_create = AppointmentCreate(
             patient_id=patient_id,
-            dentist_id=req.dentist_id,
+            dentist_id=target_dentist_id,
             date=req.preferred_date,
             start_time=req.preferred_start_time,
             end_time=req.preferred_end_time,
             reason=req.reason or f"Appointment requested via {req.source}",
-            source=req.source.upper(),
+            source="WHATSAPP" if ("WHATSAPP" in raw_source or "SIMULATOR" in raw_source) else raw_source,
             notes=f"Converted from PatientRequest {req.request_id}. Staff notes: {review_notes or 'None'}"
         )
         appointment = self.booking_service.book_appointment(apt_create)

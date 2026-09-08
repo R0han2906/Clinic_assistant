@@ -1508,13 +1508,16 @@ class ExcelClinicRepository(BaseClinicRepository):
             seq = self._next_sequence(req_rows, "request_id")
             request_id = f"REQ-{seq:06d}"
 
+            canonical_doc = self.get_dentist(request_data.dentist_id)
+            target_dentist_id = canonical_doc.dentist_id if canonical_doc else request_data.dentist_id
+
             new_row = {
                 "request_id": request_id,
                 "patient_name": request_data.patient_name,
                 "patient_phone": request_data.patient_phone,
                 "patient_age": request_data.patient_age or "",
                 "patient_id": request_data.patient_id or "",
-                "dentist_id": request_data.dentist_id,
+                "dentist_id": target_dentist_id,
                 "preferred_date": request_data.preferred_date,
                 "preferred_start_time": request_data.preferred_start_time,
                 "preferred_end_time": request_data.preferred_end_time,
@@ -1553,13 +1556,25 @@ class ExcelClinicRepository(BaseClinicRepository):
                     return self._deserialize_patient_request_row(r)
             return None
 
-    def list_patient_requests(self, status: Optional[str] = None) -> List[PatientRequestResponse]:
+    def list_patient_requests(
+        self,
+        status: Optional[str] = None,
+        patient_phone: Optional[str] = None,
+        patient_id: Optional[str] = None
+    ) -> List[PatientRequestResponse]:
         with get_workbook_lock(self.lock_path):
             all_data = self._read_all_sheets()
             results = []
+            clean_phone = "".join(filter(str.isdigit, patient_phone)) if patient_phone else ""
             for r in all_data.get(SHEET_PATIENT_REQUESTS, []):
-                if status:
-                    if r.get("status", "").lower() != status.lower():
+                if status and r.get("status", "").lower() != status.lower():
+                    continue
+                if patient_id and r.get("patient_id", "").lower() != patient_id.lower():
+                    continue
+                if patient_phone:
+                    r_phone = str(r.get("patient_phone", ""))
+                    r_clean = "".join(filter(str.isdigit, r_phone))
+                    if r_phone != patient_phone and (not clean_phone or clean_phone not in r_clean):
                         continue
                 results.append(self._deserialize_patient_request_row(r))
             return sorted(results, key=lambda x: x.created_at, reverse=True)

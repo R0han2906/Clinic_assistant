@@ -131,13 +131,13 @@ export const SlotPicker: React.FC<SlotPickerProps> = ({
             return (
               <button
                 key={slot.id}
-                onClick={() => isAvail && onSelectSlot(slot, selectedDate.label)}
-                disabled={disabled || !isAvail}
+                onClick={() => onSelectSlot(slot, selectedDate.label)}
+                disabled={disabled}
                 className={`slot-time-btn ${isAvail ? 'available' : 'unavailable'}`}
                 title={
                   isAvail
                     ? `Book ${slot.startTime} - ${slot.endTime}`
-                    : slot.unavailableReason || 'Slot unavailable'
+                    : `${slot.unavailableReason || 'Booked'} (Click to view alternative recommendations)`
                 }
               >
                 <div className="slot-btn-content">

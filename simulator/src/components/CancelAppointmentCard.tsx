@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AlertTriangle, XCircle, ArrowLeft, CheckCircle2, Clock, Calendar, User } from 'lucide-react';
-import type { ExistingPatientRecord } from '../types';
+import type { ExistingPatientRecord, UpcomingBookingItem } from '../types';
 
 interface CancelAppointmentCardProps {
   patientRecord: ExistingPatientRecord;
+  appointmentToCancel?: UpcomingBookingItem;
   onConfirmCancel: (reason: string) => Promise<void>;
   onKeepAppointment: () => void;
   isSubmitting?: boolean;
@@ -20,11 +21,12 @@ const COMMON_REASONS = [
 
 export const CancelAppointmentCard: React.FC<CancelAppointmentCardProps> = ({
   patientRecord,
+  appointmentToCancel,
   onConfirmCancel,
   onKeepAppointment,
   isSubmitting = false,
 }) => {
-  const apt = patientRecord.upcomingAppointment;
+  const apt = appointmentToCancel || patientRecord.upcomingAppointment;
   const [selectedReason, setSelectedReason] = useState(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState('');
 

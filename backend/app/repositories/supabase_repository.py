@@ -1045,6 +1045,9 @@ class SupabaseClinicRepository(BaseClinicRepository):
     def create_patient_request(self, request_data: Any) -> Any:
         with self.get_cursor(commit=True) as cursor:
             req_dict = request_data.model_dump() if hasattr(request_data, "model_dump") else dict(request_data)
+            canonical_doc = self.get_dentist(req_dict.get("dentist_id"))
+            target_dentist_id = canonical_doc.dentist_id if canonical_doc else req_dict.get("dentist_id")
+
             new_id = self._next_id(cursor, "patient_requests", "request_id", "REQ")
             now_iso = datetime.now()
 
@@ -1064,7 +1067,7 @@ class SupabaseClinicRepository(BaseClinicRepository):
                     req_dict.get("patient_phone"),
                     req_dict.get("patient_age"),
                     req_dict.get("patient_id"),
-                    req_dict.get("dentist_id"),
+                    target_dentist_id,
                     req_dict.get("preferred_date"),
                     req_dict.get("preferred_start_time"),
                     req_dict.get("preferred_end_time"),
@@ -1087,15 +1090,27 @@ class SupabaseClinicRepository(BaseClinicRepository):
             row = cursor.fetchone()
             return PatientRequestResponse(**dict(row)) if row else None
 
-    def list_patient_requests(self, status: Optional[str] = None) -> List[Any]:
+    def list_patient_requests(
+        self,
+        status: Optional[str] = None,
+        patient_phone: Optional[str] = None,
+        patient_id: Optional[str] = None
+    ) -> List[Any]:
         with self.get_cursor() as cursor:
+            query = "SELECT * FROM patient_requests WHERE 1=1"
+            params = []
             if status:
-                cursor.execute(
-                    "SELECT * FROM patient_requests WHERE status = %s ORDER BY created_at DESC;",
-                    (status,)
-                )
-            else:
-                cursor.execute("SELECT * FROM patient_requests ORDER BY created_at DESC;")
+                query += " AND status = %s"
+                params.append(status)
+            if patient_phone:
+                clean_phone = "".join(filter(str.isdigit, patient_phone))
+                query += " AND (patient_phone = %s OR patient_phone LIKE %s)"
+                params.extend([patient_phone, f"%{clean_phone}%" if clean_phone else f"%{patient_phone}%"])
+            if patient_id:
+                query += " AND patient_id = %s"
+                params.append(patient_id)
+            query += " ORDER BY created_at DESC;"
+            cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
             return [PatientRequestResponse(**dict(r)) for r in rows]
 

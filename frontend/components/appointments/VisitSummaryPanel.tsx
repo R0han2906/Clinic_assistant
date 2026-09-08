@@ -17,7 +17,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { VisitSummary, Appointment } from '@/types'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, formatTimeRange24 } from '@/lib/formatters'
 import { api } from '@/lib/api-client'
 
 interface VisitSummaryPanelProps {
@@ -109,7 +109,7 @@ export function VisitSummaryPanel({
   const data = liveSummary || summary || appointment.visitSummary || defaultSummary
   const patientName = appointment.patient || appointment.patient_name || 'Patient'
   const dentistName = appointment.dentist || appointment.dentist_name || 'Attending Dentist'
-  const appointmentTime = appointment.time || `${appointment.start_time || '10:00 AM'} › ${appointment.end_time || '11:00 AM'}`
+  const appointmentTime = formatTimeRange24(appointment.time || `${appointment.start_time || '10:00'} › ${appointment.end_time || '11:00'}`)
 
   useEffect(() => {
     setChiefComplaint(data.chiefComplaint || '')

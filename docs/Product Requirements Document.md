@@ -4,212 +4,124 @@
 
 **Working name:** DentalFlow
 
-**Product type:** Dentist-clinic staff website with a Patient Request Simulator, temporary Excel-based pilot storage, and a later WhatsApp patient-input channel.
+**Product type:** Full-stack dental clinic management platform featuring a staff operational portal, an interactive Patient WhatsApp Bot Simulator, dual storage (Supabase PostgreSQL + OpenPyXL Excel fallback), and an end-to-end inbound request approval workflow.
 
-**Document status:** Revised product baseline (aligned with website-first & simulator-first architecture)
+**Document status:** Updated Production Baseline (incorporating Walk-In Intake, WhatsApp Inbound Review, Zero-CORS Next.js Proxy, Multi-Booking Rescheduling, and Universal 24-Hour Time Standard).
 
-## 1. Important Scope Decision
+---
 
-The first product is **not** a live WhatsApp bot and **not** a general hospital-management system.
+## 1. Important Scope & Architectural Decision
 
-The core release statement is:
-> **The first release is a dentist-clinic staff website with a Patient Request Simulator, FastAPI backend, and controlled Excel pilot storage. Supabase and real WhatsApp integration come later after validation.**
+The system is a dedicated **dental clinic management platform** designed to solve the critical day-to-day administrative challenges of dental practices:
+1. **Next.js Staff Frontend (Port 3000):** Operational hub for front-desk receptionists and practitioners. Includes the Daily Calendar Board, interactive Odontogram, Walk-In Intake Drawer, and the WhatsApp Inbound Request Review Panel.
+2. **Next.js Zero-CORS Reverse Proxy:** Built into `next.config.mjs`, transparently routing browser `/api/:path*` calls to `http://127.0.0.1:8000/api/:path*` without CORS preflight latency.
+3. **FastAPI Layered Backend (Port 8000):** Modular MVC architecture with dedicated routes, controllers, domain services, and repository layers.
+4. **Dual Storage Engine:** Supabase PostgreSQL (17 relational tables, connection pooling) as primary production storage, with an OpenPyXL Excel repository (`clinic_data.xlsx` with thread-safe `lock-once-delegate` file locking) for offline/pilot deployments.
+5. **Patient WhatsApp Bot Simulator (`simulator/` on Port 5173):** Realistic mobile chat interface simulating patient interactions (new bookings, multi-appointment rescheduling, direct cancellations).
+6. **Universal 24-Hour Time Standard (`HH:mm`):** All times across calendar columns, appointment cards, visit logs, bot slot chips, and API schemas strictly follow 24-hour military notation (`hour12: false`).
 
-There is currently **no dedicated business WhatsApp number** available. Therefore, the initial version must not depend on a live WhatsApp account, dedicated phone number, or WhatsApp Business Platform integration.
+---
 
-Instead, the product introduces a **Patient Request Simulator** that imitates the structured requests a patient would later send through WhatsApp. It submits requests directly to the same FastAPI backend services that the future WhatsApp webhook will use.
+## 2. Product Summary & Data Flow
 
-For this document, “hospital” means **dentist clinic**.
+DentalFlow provides dental clinic staff with a comprehensive, modern web platform. Staff can manage patients, schedule appointments, record dental checkups with visual teeth numbering, manage sales/invoices, adjust inventory, and review incoming requests.
 
-## 2. Product Summary
-
-DentalFlow provides dental-clinic staff with a simple, reliable internal website. Staff can register a patient, record basic registration details, record structured previous visit summaries, select the dentist requested by the patient, check dentist availability, and book an appointment range.
-
-To test and prove patient-side appointment workflows without waiting for a business WhatsApp number, DentalFlow includes a **Patient Request Simulator**. The simulator acts as an input adapter sending structured appointment requests to the FastAPI backend.
-
-### Intended Flow (Current Iteration)
+### Integrated Request Approval Flow
 ```text
-Patient Request Simulator
-        -> FastAPI patient-request endpoint
-        -> patient and availability services
-        -> appointment service
-        -> temporary Excel storage
-        -> clinic staff website
+Patient WhatsApp Simulator (Port 5173)
+        -> POST /api/v1/patient-requests (status: 'pending', id: 'REQ-XXXXXX')
+        -> Next.js Staff Frontend (Port 3000 - Inbound Request Panel)
+        -> Front-Desk Staff 1-Click Approval
+        -> POST /api/v1/patient-requests/{id}/approve
+        -> Automatic Confirmed Appointment Creation (source: 'WHATSAPP')
+        -> Live Event Bus updates CalendarBoard without page reload
 ```
 
-### Future Flow (Post-Validation)
+### Walk-In Patient Intake Flow
 ```text
-Patient WhatsApp
-        -> WhatsApp webhook
-        -> same FastAPI patient-request and appointment services
-        -> Supabase or approved production storage later
-        -> clinic staff website
+Unscheduled Walk-In Patient arrives at Front Desk
+        -> Receptionist opens Walk-In Drawer
+        -> Live Autocomplete Search (/api/v1/patients/lookup?q=...)
+        -> Existing patient auto-fills demographics OR new patient registered
+        -> Live On-Duty Dentist Availability Grid calculates real-time conflicts
+        -> System highlights shortest-wait dentist
+        -> Staff books immediate appointment (source: 'WALK_IN')
+        -> Instant calendar placement
 ```
 
-During the initial iteration stage, the system stores data in a structured Excel workbook (`clinic_data.xlsx`) rather than Supabase. The website remains the primary user interface for staff. The workbook is the temporary pilot data store and can be inspected or exported by staff.
-
-Later, patients will submit appointment requests through WhatsApp. WhatsApp will send structured requests to the exact same backend workflow. It will not create a separate booking system.
+---
 
 ## 3. Product Vision
 
-> Give small dental clinics a simple, reliable way to register patients, manage dentist availability, and simulate patient requests before introducing real WhatsApp automation and cloud database infrastructure.
+> Deliver a unified, beautiful, zero-friction operating system for dental practices—seamlessly bridging front-desk calendar operations, walk-in patient triage, clinical odontograms, and patient-side WhatsApp booking interactions.
 
-## 4. First Target Customer
+---
 
-The first customer is a single-location dental clinic with one dentist most of the time, with support for two or three dentists when necessary. The clinic has front-desk staff who need a clear, dependable way to register patients, record past visits, and schedule appointments without double booking.
+## 4. Target Users
 
-The first release does not target general hospitals, large dental chains, emergency departments, or complex multi-location practices.
-
-## 5. Users
-
-| User | Main need |
+| User | Main Need |
 |---|---|
-| Receptionist or clinic staff | Register patients, review previous visits, check dentist availability, and book/manage appointments |
-| Dentist | Review daily schedule, appointments, and patient summaries |
-| Clinic owner | Review operational activity, working hours, and dentist availability |
-| Platform administrator / Developer | Configure clinic settings, inspect workbook data health, and manage system backups |
-| Simulator User / Tester | Simulate patient appointment requests imitating future WhatsApp messages |
-| Patient (Later Phase) | Submit appointment requests through WhatsApp once a dedicated business number is configured |
+| Receptionist / Front Desk | Triage walk-ins, review incoming WhatsApp booking requests, manage calendar appointments, register patients, process billing |
+| Dentist / Practitioner | Review daily schedule, access visual odontogram chart, inspect previous visit summaries and medical histories |
+| Clinic Owner / Manager | Monitor daily operational revenue, appointments, dentist utilization, and inventory levels |
+| Patient (via WhatsApp Simulator) | Discover available clinic slots, request appointments, review upcoming bookings, reschedule or cancel anytime |
 
-## 6. Product Principles
+---
 
-1. **Website first:** Build and validate the clinic staff workflow before WhatsApp.
-2. **Simulator first for patient input:** Use a Patient Request Simulator to prove patient-side workflows before acquiring WhatsApp Business infrastructure.
-3. **Excel first, but temporary:** Use a structured workbook for early iterations; do not treat it as the final production database.
-4. **One booking engine:** Website bookings, simulator requests, and future WhatsApp bookings must use the identical availability and appointment domain rules.
-5. **Small-clinic focus:** Optimize for a single dental clinic before supporting complex multi-facility organizations.
-6. **Human control:** Staff can review, modify, reschedule, or cancel every appointment.
-7. **Administrative scope:** Store only administrative and registration information needed for scheduling.
-8. **No unsafe clinical automation:** Strictly administrative; do not diagnose, triage, or prescribe.
-9. **Migration-ready:** Excel columns, types, and identifiers must be strictly normalized so migration to Supabase or PostgreSQL requires zero application logic changes.
+## 5. Core Product Principles
 
-## 7. MVP Goals
+1. **Website & Calendar Centricity:** The clinic staff calendar remains the single source of operational truth.
+2. **Zero-Friction Inbound Review:** Incoming WhatsApp requests land in an interactive review drawer where staff approve or reject with 1 click.
+3. **Unified Booking Engine:** Walk-ins, phone reservations, and WhatsApp requests all use the exact same availability validation engine.
+4. **24-Hour Time Precision:** Strict `HH:mm` notation eliminates AM/PM scheduling ambiguities.
+5. **Zero-CORS Reliability:** Server-side proxy rewrites ensure client-side requests never fail due to CORS or local loopback resolution issues.
+6. **Human-in-the-Loop:** Clinical and scheduling decisions remain under staff control.
 
-The first release must allow staff and testers to:
+---
 
-- Authenticate safely into the staff website.
-- Register a patient with name, age/DOB, phone number, and required clinic acknowledgements.
-- Check for duplicate patients before creating new records.
-- Record concise, structured previous visit summaries.
-- Configure and inspect dentist working hours, breaks, and leaves.
-- See whether one, two, or three dentists are available on any given date.
-- Calculate valid appointment ranges excluding working hours, breaks, leaves, and booked appointments.
-- Book, reschedule, and cancel appointment ranges with zero double bookings.
-- Review the daily dentist schedule.
-- Search for existing patients by name, phone, or stable identifier.
-- Update patient demographics, contact details, address, and medical flags via `PATCH /api/patients/{id}`.
-- Store and retrieve all records from a structured 12-sheet Excel workbook (`clinic_data.xlsx`) with file locking, atomic writes, and single-workbook storage invariants (preventing backup file sprawl).
-- Submit simulated patient appointment requests and cancel them via the **Patient Request Simulator**, verifying that state reflects in real time.
-- Export or download the Excel workbook for backup or manual audit.
+## 6. Detailed Feature Requirements
 
-## 8. Initial Data Scope
+### A. Walk-In Intake & On-Duty Roster (`features/walk-in`)
+- **Live Autocomplete Search:** Debounced query against `/api/v1/patients/lookup?q=...` searching by name, phone, or patient ID (`PAT-XXXXXX`).
+- **On-Duty Dentist Availability Grid (`DentistAvailabilityGrid.tsx`):**
+  - Fetches all dentists on duty for the current date.
+  - Dynamically computes ongoing appointments, next free slot, and estimated wait minutes.
+  - Highlights the dentist with the **shortest wait time** via visual badge.
+- **Walk-In Tagging:** Appointments created via this drawer are tagged with `source: 'WALK_IN'`.
 
-### Patient registration
-The patient record contains essential fields for registration and scheduling operations:
-- Patient identifier (`PAT-000001` format).
-- Full name.
-- Age or date of birth.
-- Phone number.
-- Optional email address.
-- Gender (e.g. "Male", "Female", "Other").
-- Residential street address.
-- Emergency contact name and phone.
-- Known drug/medical allergies (e.g. Penicillin).
-- Known pre-existing medical conditions (e.g. Hypertension).
-- Consent / acknowledgement status.
-- Created timestamp and last updated timestamp.
+### B. WhatsApp Inbound Request Review (`features/whatsapp-agent`)
+- **Top Navigation Counter Badge (`BookingRequestBadge.tsx`):** Displays pending request count with live pulse animation and 15s background polling.
+- **Review Drawer (`BookingRequestPanel.tsx` & `BookingRequestCard.tsx`):**
+  - Displays patient contact details, preferred dentist, requested date, 24h slot (`HH:mm`), and reason.
+  - **1-Click Approval:** Converts request to a confirmed calendar appointment tagged with `source: 'WHATSAPP'`.
+  - **1-Click Rejection:** Marks request as rejected with rejection reason.
+  - Automatically notifies the calendar via `eventBus.publish('APPOINTMENT_CREATED')`.
 
-### Previous visits
-Structured visit summaries, not an unbounded electronic medical record (EMR):
-- Visit identifier (`VIS-000001` format).
-- Patient identifier.
-- Visit date.
-- Dentist identifier and name.
-- Visit type (e.g., consultation, cleaning, follow-up, procedure).
-- Short staff-entered summary (concise administrative notes).
-- Follow-up recommendation date, if applicable.
+### C. Patient WhatsApp Simulator (`simulator/`)
+- **Interactive Mobile Chat:** Clean, responsive WhatsApp UI running on Port 5173.
+- **Dynamic Request Generation:** Assigns persistent `REQ-XXXXXX` IDs to each intake request.
+- **Direct Cancellation:** Confirmation cards include an immediate "Cancel Request" action that updates request status to `cancelled` via `PATCH /api/v1/patient-requests/{id}`.
+- **Multi-Booking Rescheduling:** Patients can view all their upcoming appointments and choose which specific booking to reschedule.
+- **24-Hour Slot Chips:** All available time slots rendered in `HH:mm` format.
 
-### Dentist availability & scheduling
-- Dentist identifier (`DOC-000001` format) and profile.
-- Working days and hours per day of the week.
-- Break periods.
-- Leave and blocked date ranges.
-- Standard slot duration (e.g., 30 or 60 minutes).
-- Active status.
-- Maximum parallel dentists supported (1 to 3 dentists).
+### D. Calendar Board & Scheduling
+- **Daily View Columns:** 09:00 to 00:00 schedule grid with 24-hour left-axis time markings.
+- **Card Formatting:** Appointment cards display 24h intervals (`09:00 › 10:00`, `14:30 › 15:30`).
+- **Conflict Prevention:** Zero double bookings enforced at the database transaction layer.
 
-## 9. Appointment Requirements
+### E. Backend Robustness & Phone Matching
+- **Digit-Matching Query Filters:** `GET /api/v1/patient-requests?patient_phone=...` strips non-digit characters and matches the trailing 10 digits, harmonizing international `+91` and local phone numbers.
+- **Autocomplete Endpoint:** `GET /api/v1/patients/lookup?q=...` returns top 8 matching patients instantly.
+- **Reschedule Endpoint:** `POST /api/v1/appointments/{id}/reschedule` validates dentist availability and updates slot atomically.
 
-The appointment flow must:
-1. Identify the patient (existing or newly registered).
-2. Show the requested dentist or available dentists.
-3. Evaluate dentist working hours, leave, breaks, and existing appointments under a single read lock.
-4. Return valid non-conflicting appointment ranges.
-5. Allow staff (or simulator) to select a valid range.
-6. Atomically lock, re-validate, and persist the appointment to the workbook.
-7. Record an audit log entry.
-8. Display the confirmed appointment on the daily schedule.
+---
 
-The first version uses deterministic slot calculation. Flexible dynamic slotting will be added only after real clinic scheduling patterns are observed.
+## 7. Success Metrics
 
-## 10. Website Requirements
-
-The staff website must provide:
-- Secure staff authentication.
-- Patient registration form with duplicate detection.
-- Patient search and profile management.
-- Structured previous-visit entry and history view.
-- Dentist schedule configuration (hours per weekday, breaks, leave dates).
-- Daily schedule view per dentist.
-- Appointment creation, rescheduling, and cancellation.
-- Real-time workbook health indicator.
-- Manual workbook export/download button.
-- Clear error handling for locked files or write conflicts.
-
-## 11. Patient Request Simulator Requirements
-
-The Patient Request Simulator must:
-- Provide a clear test harness interface simulating the patient's perspective.
-- Capture: patient name, phone number, requested dentist (or "any"), preferred date, preferred time range, and appointment reason.
-- Submit structured JSON payloads to the FastAPI patient-request endpoint.
-- Receive and display available slots or booking confirmations.
-- Be completely decoupled from the staff website UI, functioning strictly as an external input adapter.
-
-## 12. WhatsApp Later
-
-WhatsApp is deferred to a later phase once a dedicated WhatsApp Business number is provisioned and internal workflows are stabilized.
-
-When integrated, WhatsApp will:
-- Act purely as an input channel replacing the simulator adapter.
-- Convert incoming WhatsApp messages into the exact same command structures used by the simulator.
-- Use the identical FastAPI availability and appointment services.
-- Never write directly to the Excel workbook or bypass business rules.
-
-## 13. Explicitly Out of Scope
-
-- Real WhatsApp Business Platform integration in the first release.
-- Live business phone number dependency.
-- Supabase or PostgreSQL in the first iteration.
-- Full electronic medical record (EMR) system.
-- Clinical diagnosis, medical advice, or prescription generation.
-- Emergency triage or urgent care routing.
-- Billing, insurance claims, pharmacy, or laboratory integration.
-- Multi-location clinic hierarchies.
-- Native mobile applications (iOS/Android).
-
-## 14. Success Metrics
-
-| Metric | Initial Target |
+| Metric | Target |
 |---|---|
-| Pilot dental clinics | 1 partner clinic (expandable to 3) |
-| Staff self-sufficiency | 100% of staff complete registration and booking without developer intervention |
-| Double booking rate | 0% double bookings under concurrent staff and simulator activity |
-| Data-write reliability | 100% of confirmed actions persisted atomically with zero corruption |
-| Simulator-to-Staff workflow | Simulated patient requests appear on staff schedule in real time |
-| Excel-to-Database migration readiness | 100% of records use stable sequenced IDs and strict column types |
-| Staff satisfaction | Positive feedback after 2 weeks of continuous operational use |
-
-## 15. Product Positioning
-
-The product is positioned as:
-> **A simple, dedicated dental-clinic appointment and patient-registration website with a patient-request simulator, helping staff manage dentist availability and patient records without the bloat or cost of a generic hospital management suite.**
+| Double Booking Rate | Exactly 0% |
+| Inbound Approval Latency | < 1 second for 1-click staff approval to calendar sync |
+| Phone Lookup Precision | 100% match rate across `+91` and 10-digit formats |
+| 24-Hour Time Consistency | 100% compliance across all frontend cards and backend payloads |
+| API Communication Health | 0 CORS errors via Next.js reverse proxy |

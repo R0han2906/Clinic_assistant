@@ -8,6 +8,7 @@ import { SidebarToggle } from '@/components/layout/Sidebar'
 import { navConfig } from '@/lib/constants'
 import { MyAccountMenu } from '@/components/layout/MyAccountMenu'
 import { defaultClinicConfig } from '@/lib/clinic-config'
+import { BookingRequestBadge, WhatsAppSimulatorModal } from '@/features/whatsapp-agent'
 
 function usePageTitle(): string {
   const pathname = usePathname()
@@ -25,6 +26,7 @@ export function Header() {
   const { openMobile } = useSidebarStore()
   const title = usePageTitle()
   const [showLocationPopover, setShowLocationPopover] = useState(false)
+  const [simulatorOpen, setSimulatorOpen] = useState(false)
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -64,7 +66,7 @@ export function Header() {
             <span>Main Center</span>
             <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Open · 9AM - 12AM
+              Open · 09:00 - 00:00
             </span>
           </button>
 
@@ -90,6 +92,9 @@ export function Header() {
 
       {/* Right controls */}
       <div className="ml-auto flex items-center gap-3">
+        {/* WhatsApp Inbound Requests Badge */}
+        <BookingRequestBadge onOpenSimulator={() => setSimulatorOpen(true)} />
+
         {/* Quick Walk-In / Create button */}
         <button
           onClick={() => {
@@ -108,6 +113,9 @@ export function Header() {
 
         {/* My Account Staff Hub Dropdown */}
         <MyAccountMenu />
+
+        {/* Floating WhatsApp Simulator Modal */}
+        <WhatsAppSimulatorModal open={simulatorOpen} onClose={() => setSimulatorOpen(false)} />
       </div>
     </header>
   )

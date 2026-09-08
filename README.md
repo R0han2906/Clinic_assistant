@@ -2,10 +2,11 @@
 
 An enterprise-ready dental clinic management ecosystem built for clinic receptionists, practitioners, and patient communication. The repository comprises three integrated applications and comprehensive technical specifications:
 
-1. **`frontend/` — Clinix Receptionist Clinic Dashboard** (Next.js 16 App Router + Tailwind CSS v4)
-2. **`backend/` — FastAPI Domain API** (Dual repository: Supabase PostgreSQL 17-table relational database + OpenPyXL Excel pilot storage)
-3. **`patient-whatsapp-simulator/` — Patient WhatsApp Simulator** (React + TypeScript + Vite)
+1. **`frontend/` — Clinix Receptionist Clinic Dashboard** (Next.js 16 App Router + Tailwind CSS v4 + Zero-CORS Next.js Proxy)
+2. **`backend/` — FastAPI Domain API** (Layered MVC: Supabase PostgreSQL 17-table relational database + OpenPyXL Excel pilot fallback)
+3. **`simulator/` — Patient WhatsApp Simulator** (React + TypeScript + Vite running on Port 5173)
 4. **`future_plans/` — Modular Feature Specifications & Implementation Roadmaps**
+5. **`docs/` & `backend/docs/` — Comprehensive System Documentation**
 
 ---
 
@@ -13,42 +14,41 @@ An enterprise-ready dental clinic management ecosystem built for clinic receptio
 
 - [`frontend/`](frontend/) — **Clinix / Zendenta v3 Receptionist Clinic Dashboard**
   - **Framework:** Next.js 16 (Turbopack) with strict Server vs. Client Component discipline.
-  - **Modules:** Multi-dentist daily calendar (`/reservations`), Lobby Waiting Room with color-coded timers (`/dashboard`), 4-step Walk-In intake drawer, Patients directory (`/patients`), Treatments catalog (`/treatments`), Staff list, and Role-partitioned reports (`/reports`).
-  - **Direct-Access Mode:** Streamlined for clinic front-desk operations without login friction; direct access to patient intake, scheduling, and billing workflows.
-  - **Synchronization & Collision Engine:** Timezone-safe local calendar coordinates, multi-identifier doctor mapping (`DEN-000001` Dr. Sarah Wilson, `DEN-000002` Dr. Michael Chen, `DEN-000003` ROHAN), and live event listeners (`appointment-created`, `appointment-updated`).
+  - **Zero-CORS Reverse Proxy:** Built-in `next.config.mjs` server rewrites proxying `/api/:path*` to `http://127.0.0.1:8000/api/:path*`, eliminating browser CORS issues and IPv6 resolution mismatches.
+  - **Walk-In Intake Triage (`features/walk-in`):** Live debounced patient search autocomplete (`/api/v1/patients/lookup`) and on-duty dentist availability grid (`DentistAvailabilityGrid.tsx`) with real-time wait estimation and shortest-wait badges. Appointments tagged with `source: 'WALK_IN'`.
+  - **WhatsApp Inbound Review Drawer (`features/whatsapp-agent`):** Unread counter badge (`BookingRequestBadge.tsx`) with live pulse animation, and review drawer (`BookingRequestPanel.tsx`) with 1-click approvals converting simulator intake requests into confirmed calendar appointments (`source: 'WHATSAPP'`).
+  - **Strict 24-Hour Time Standard (`HH:mm`):** Calendar left axis `09:00` to `00:00`, appointment cards (`09:00 › 10:00`), clinic header operating timings (`09:00 - 00:00`), and visit summaries strictly enforce 24-hour military time (`hour12: false`).
+  - **Modules:** Multi-dentist daily calendar (`/reservations`), Lobby Waiting Room with color-coded timers (`/dashboard`), Walk-In intake drawer, Patients directory (`/patients`), Treatments catalog (`/treatments`), Staff list, and Role-partitioned reports (`/reports`).
   - **Lifecycle Engine:** 7-state appointment machine (`scheduled`, `checked-in`, `in-progress`, `completed`, `paid`, `cancelled`, `no-show`).
-  - **Interactive Modals:** Take Payment (480px), Read-only Visit Summary, Reschedule, Cancel, and Walk-in intake.
   - See [`frontend/README.md`](frontend/README.md) and [`frontend/FRONTEND.md`](frontend/FRONTEND.md).
 
 - [`backend/`](backend/) — **FastAPI Core Backend**
   - **Layered Architecture:** Dedicated Routes (`/api/v1` & `/api`), Domain Services, Controllers, and Pydantic validation schemas.
-  - **Dual Storage Engine:** Seamlessly toggle between Supabase PostgreSQL (17 relational tables with connection pooling) and OpenPyXL Excel pilot workbook (`clinic_data.xlsx`) with OS-level file locking and atomic writes.
-  - **Hardened Serialization:** Nullable foreign keys (`patient_id`, `dentist_id`) and ISO timestamp conversion preventing serialization crashes.
-  - **API Surface:** Patients, Appointments, Provider Availability, Treatments, Odontogram Checkups, Billing/Sales, Inventory, Purchases, Staff, and On-Demand CSV exports.
-  - See [`backend/README.md`](backend/README.md).
+  - **Dual Storage Engine:** Seamlessly toggle between Supabase PostgreSQL (17 relational tables with connection pooling) and OpenPyXL Excel pilot workbook (`clinic_data.xlsx`) with OS-level `lock-once-delegate` file locking and atomic writes.
+  - **Filtering & Digit-Matching:** `GET /api/v1/patient-requests` supports `patient_phone` filtering with trailing 10-digit matching, seamlessly pairing `+91` international numbers with local inputs.
+  - **Autocomplete & Rescheduling:** `GET /api/v1/patients/lookup?q=...` and `POST /api/v1/appointments/{id}/reschedule`.
+  - **Dedicated Documentation:** See [`backend/docs/README.md`](backend/docs/README.md), [`backend/docs/ARCHITECTURE.md`](backend/docs/ARCHITECTURE.md), [`backend/docs/API_DOCUMENTATION.md`](backend/docs/API_DOCUMENTATION.md), and [`backend/docs/PATIENT_REQUESTS_WORKFLOW.md`](backend/docs/PATIENT_REQUESTS_WORKFLOW.md).
 
-- [`patient-whatsapp-simulator/`](patient-whatsapp-simulator/) — **Patient WhatsApp Simulator**
+- [`simulator/`](simulator/) — **Patient WhatsApp Simulator**
   - **Framework:** React + TypeScript + Vite + Tailwind CSS.
-  - **Purpose:** Emulates WhatsApp conversational intake, phone verification, slot selection, profile editing, and cancellation flows before physical WhatsApp business deployment.
+  - **Intake Flow:** Mobile messaging UI generating persistent `REQ-XXXXXX` requests.
+  - **Direct Cancellation:** 1-click cancellation action directly from the Confirmation Card calling `PATCH /api/v1/patient-requests/{id}`.
+  - **Multi-Booking Rescheduling:** Displays all upcoming appointments for the verified phone number and allows the patient to select which booking to reschedule.
+  - **24-Hour Time Notation:** All available slot chips render in 24-hour military time (`HH:mm`).
 
 - [`future_plans/`](future_plans/) — **Architectural Feature Roadmaps & Modular Markdown Plans**
-  - `01_clinic_branding_logo_address.md` — Clinix branding & address customization.
-  - `02_navbar_and_header_simplification.md` — Header and navigation streamlining.
-  - `03_reservations_calendar_overlap_and_stacking.md` — Enhanced multi-slot collision handling.
-  - `04_reservations_timeline_9am_to_12am.md` — Extended timeline operational hours.
-  - `05_merged_financials_and_accounts_hub.md` — Unified financial & billing dashboard.
-  - `06_payment_methods_streamlining.md` — Payment gateway & method optimization.
-  - `07_unified_inventory_and_equipment_hub.md` — Stock and peripheral asset hub.
-  - `08_master_implementation_schedule.md` — Master implementation timeline.
+  - Modular roadmap documents covering branding, navbar simplification, calendar overlapping, financials, inventory, and master schedules.
 
 - [`docs/`](docs/) — **Complete System Specifications & References**
-  - [`API Reference.md`](docs/API%20Reference.md) — Comprehensive REST API endpoints and payload schemas.
-  - [`System Architecture.md`](docs/System%20Architecture.md) — Technical architecture, concurrency, and repository model.
-  - [`Product Requirements Document.md`](docs/Product%20Requirements%20Document.md) — Product requirements and MVP scope.
-  - [`Product Design Specification.md`](docs/Product%20Design%20Specification.md) — Receptionist UX & simulator interaction design.
-  - [`Implementation Phases.md`](docs/Implementation%20Phases.md) — Roadmap and verification gates.
-  - [`Project Rules.md`](docs/Project%20Rules.md) — Non-negotiable safety, validation, and concurrency rules.
-  - [`Project Memory.md`](docs/Project%20Memory.md) — Decision log and system context.
+  - [`README.md`](docs/README.md) — Documentation index and master reference.
+  - [`API Reference.md`](docs/API%20Reference.md) — Comprehensive REST API endpoints, schemas, and proxy rewrites.
+  - [`System Architecture.md`](docs/System%20Architecture.md) — Technical architecture, proxy model, concurrency, and repository model.
+  - [`Product Requirements Document.md`](docs/Product%20Requirements%20Document.md) — Product requirements, walk-in intake, and MVP scope.
+  - [`Product Design Specification.md`](docs/Product%20Design%20Specification.md) — Receptionist UX, Walk-In drawer, WhatsApp review, & simulator design.
+  - [`Implementation Phases.md`](docs/Implementation%20Phases.md) — 9-phase roadmap and verification gates.
+  - [`Project Rules.md`](docs/Project%20Rules.md) — 24-hour standard, zero-CORS proxying, phone digit matching, and concurrency rules.
+  - [`Project Memory.md`](docs/Project%20Memory.md) — Durable decisions, 20-revision history log, and system context.
+  - [`Agent.md`](docs/Agent.md) — Agent operating manual and definition of done.
 
 ---
 
@@ -83,7 +83,7 @@ pnpm dev
 ### 3. Run the Patient WhatsApp Simulator (React + Vite)
 
 ```powershell
-cd patient-whatsapp-simulator
+cd simulator
 npm install
 npm run dev
 ```

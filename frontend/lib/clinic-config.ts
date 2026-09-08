@@ -58,8 +58,8 @@ export const defaultClinicConfig: ClinicMetadata = {
     director: "Dr. Darrell Steward, D.D.S.",
   },
   timings: {
-    weekdays: "09:00 AM - 12:00 AM",
-    weekends: "10:00 AM - 08:00 PM",
+    weekdays: "09:00 - 00:00",
+    weekends: "10:00 - 20:00",
   },
 }
 

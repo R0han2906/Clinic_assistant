@@ -21,6 +21,7 @@ import {
   parseTimeToHour,
   PositionedAppointment,
 } from '@/lib/calendar-collision'
+import { formatTimeRange24 } from '@/lib/formatters'
 
 // ─── Lazy Loaded Interactive Dialogs ──────────────────────────────────────────
 
@@ -393,7 +394,7 @@ function CurrentTimeIndicator() {
   }
 
   const topPx = (currentHour - CALENDAR_START_HOUR) * HOUR_HEIGHT_PX
-  const timeBadge = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const timeBadge = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 
   return (
     <div
@@ -463,10 +464,10 @@ function CalendarGrid({
   loading,
 }: CalendarGridProps) {
   const hours = [
-    '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-    '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM',
-    '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM',
-    '09:00 PM', '10:00 PM', '11:00 PM', '12:00 AM',
+    '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00',
+    '17:00', '18:00', '19:00', '20:00',
+    '21:00', '22:00', '23:00', '00:00',
   ]
   const [dragOverSlot, setDragOverSlot] = useState<{ docId: string; hourIdx: number } | null>(null)
   const [draggingApptId, setDraggingApptId] = useState<string | null>(null)
@@ -647,11 +648,13 @@ function CalendarGrid({
 
                 const patientName = appt.patient || (appt as any).patient_name || 'Patient'
                 const treatment = appt.treatment || (appt as any).treatment_name || 'General Checkup'
-                const timeString = appt.time || `${appt.start_time || '09:00 AM'} › ${appt.end_time || '10:00 AM'}`
+                const timeString = formatTimeRange24(appt.time || `${appt.start_time || '09:00'} › ${appt.end_time || '10:00'}`)
                 const apptId = appt.id || (appt as any).appointment_id || `apt-${idx}`
                 const isDraggable = status !== 'completed' && status !== 'paid'
 
                 const isWalkIn = appt.source === 'WALK_IN' || (appt as any).source === 'walk-in'
+                const rawSource = String(appt.source || (appt as any).source || '').toUpperCase()
+                const isWhatsApp = rawSource.includes('WHATSAPP') || rawSource.includes('SIMULATOR')
 
                 return (
                   <div
@@ -691,7 +694,11 @@ function CalendarGrid({
                       'absolute rounded-xl border p-2 text-left shadow-xs transition-all duration-150 hover:scale-[1.02] hover:z-50 hover:shadow-lg flex flex-col justify-between overflow-hidden group select-none',
                       isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
                       statusMeta.cardBgClass,
-                      isWalkIn ? 'border-dashed border-amber-400/90 shadow-amber-500/5' : statusMeta.borderClass,
+                      isWalkIn
+                        ? 'border-dashed border-amber-400/90 shadow-amber-500/5'
+                        : isWhatsApp
+                        ? 'border-dashed border-emerald-400/90 shadow-emerald-500/5'
+                        : statusMeta.borderClass,
                       draggingApptId === apptId && 'opacity-40 ring-2 ring-primary ring-offset-2 scale-95'
                     )}
                   >
@@ -704,6 +711,11 @@ function CalendarGrid({
                           {isWalkIn && (
                             <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100/90 text-amber-800 px-1.5 py-0.2 text-[8px] font-extrabold border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 shrink-0">
                               🚶 Walk-in
+                            </span>
+                          )}
+                          {isWhatsApp && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100/90 text-emerald-800 px-1.5 py-0.2 text-[8px] font-extrabold border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shrink-0">
+                              💬 WhatsApp
                             </span>
                           )}
                         </div>
@@ -1127,9 +1139,21 @@ export function CalendarBoard({
                       <div className="flex items-center gap-3">
                         <div className={cn('size-3 rounded-full', meta.dotClass, 'bg-current')} />
                         <div>
-                          <p className="text-sm font-bold text-foreground">
-                            {a.patient || a.patient_name}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-bold text-foreground">
+                              {a.patient || a.patient_name}
+                            </p>
+                            {String(a.source || '').toUpperCase().includes('WHATSAPP') && (
+                              <span className="rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.2 text-[9px] font-extrabold border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
+                                WhatsApp
+                              </span>
+                            )}
+                            {String(a.source || '').toUpperCase().includes('WALK') && (
+                              <span className="rounded-full bg-amber-100 text-amber-800 px-1.5 py-0.2 text-[9px] font-extrabold border border-amber-300 dark:bg-amber-950 dark:text-amber-300">
+                                Walk-in
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {a.treatment || a.treatment_name} · {a.dentist || a.dentist_name}
                           </p>

@@ -70,11 +70,23 @@ export const mockExistingPatients: ExistingPatientRecord[] = [
     ageOrDob: '32',
     lastVisitDate: '2026-08-15',
     lastVisitType: 'Routine Scaling & Cleaning',
+    upcomingAppointments: [
+      {
+        referenceCode: 'DEMO-884920',
+        type: 'appointment',
+        dentistName: 'Dr. Ananya Rao',
+        date: '2026-09-08',
+        time: '10:00 - 10:30',
+        status: 'scheduled'
+      }
+    ],
     upcomingAppointment: {
       referenceCode: 'DEMO-884920',
+      type: 'appointment',
       dentistName: 'Dr. Ananya Rao',
       date: '2026-09-08',
-      time: '10:00 - 10:30'
+      time: '10:00 - 10:30',
+      status: 'scheduled'
     }
   },
   {
@@ -83,7 +95,8 @@ export const mockExistingPatients: ExistingPatientRecord[] = [
     phone: '+91 9876543210',
     ageOrDob: '28',
     lastVisitDate: '2026-07-10',
-    lastVisitType: 'Root Canal Follow-up'
+    lastVisitType: 'Root Canal Follow-up',
+    upcomingAppointments: []
   }
 ];
 

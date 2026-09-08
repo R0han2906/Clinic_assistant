@@ -1148,8 +1148,8 @@ PUT /api/dentists/DOC-000001/schedule/1
      "patient_phone": "+91 9876500001",
      "dentist_id": "DOC-000001",
      "preferred_date": "2026-09-14",
-     "preferred_start_time": "10:00",
-     "preferred_end_time": "10:30",
+     "preferred_start_time": "14:00",
+     "preferred_end_time": "14:30",
      "source": "simulator"
    }
    → Returns REQ-000001 in status "pending"
@@ -1157,23 +1157,37 @@ PUT /api/dentists/DOC-000001/schedule/1
 2. Staff reviews pending requests on website dashboard:
    GET /api/v1/patient-requests?status=pending
 
+   Patients can also look up their existing requests by phone or patient ID:
+   GET /api/v1/patient-requests?patient_phone=9876500001
+   (Supports digit-level matching across '+91 9876500001' and '9876500001')
+
 3. Staff accepts request:
    POST /api/v1/patient-requests/REQ-000001/approve
    → System auto-registers/matches patient
-   → Books confirmed appointment under filelock
+   → Books confirmed appointment under write lock (source: 'WHATSAPP')
    → Request transitions to "approved" with appointment_id
 ```
 
-### Update Patient Profile Flow (Simulator or Reception)
+### Walk-In Patient Autocomplete Lookup
 ```
-1. Front desk or patient requests detail update:
-   PATCH /api/patients/PAT-000001
-   {
-     "phone": "+91 9999988888",
-     "address": "Flat 4B, Lotus Apartments",
-     "allergies": "Sulfa drugs"
-   }
-   → Returns updated Patient record with refreshed updated_at timestamp.
+Fast debounced search endpoint used by the Walk-In Intake flow:
+GET /api/v1/patients/lookup?query=98765
+GET /api/v1/patients/lookup?query=Aarav
+→ Returns matching patient records with demographic details, medical alerts, and allergies.
+```
+
+### Appointment Rescheduling Flow (Simulator & Calendar Drag-and-Drop)
+```
+POST /api/v1/appointments/APT-000001/reschedule
+{
+  "new_date": "2026-09-20",
+  "new_start_time": "15:00",
+  "new_end_time": "15:30",
+  "new_dentist_id": "DEN-000001",
+  "reschedule_reason": "Patient requested afternoon appointment"
+}
+→ Validates slot availability under write lock (returns 409 Conflict if occupied).
+→ Updates appointment and returns updated record.
 ```
 
 ### Cancellation Flow (Dual Reference: REQ- & APT-)
@@ -1188,4 +1202,32 @@ PUT /api/dentists/DOC-000001/schedule/1
      { "reason": "Patient requested cancellation" }
      → Marks appointment as "cancelled" and immediately frees the slot on availability.
 ```
+
+---
+
+## Next.js API Reverse Proxy & Zero-CORS Architecture
+
+In `frontend/next.config.mjs`, a server-side rewrite rules proxies all `/api/:path*` requests to the FastAPI backend on `http://127.0.0.1:8000/api/:path*`:
+```javascript
+async rewrites() {
+  return [
+    {
+      source: '/api/:path*',
+      destination: 'http://127.0.0.1:8000/api/:path*',
+    },
+  ]
+}
+```
+Client browsers make same-origin requests (`/api/v1/...`), avoiding CORS preflight checks, IPv6 `[::1]` resolution mismatches on Windows, and cross-origin fetch failures.
+
+---
+
+## 24-Hour Time Format Standard
+
+All time-related strings across requests and responses strictly adhere to **24-hour format (`HH:mm`)**:
+- Start / End Times: `09:00`, `14:00`, `14:30`, `17:00`
+- Available Slots: `['09:00', '09:30', '10:00', '10:30', ...]`
+- Calendar Axes: `09:00` to `00:00` (midnight)
+- Avoids AM/PM ambiguity across all modules.
+
 

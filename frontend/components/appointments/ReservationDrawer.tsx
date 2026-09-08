@@ -33,6 +33,7 @@ import {
   ReceptionistAction,
 } from '@/lib/appointment-lifecycle'
 import { PatientAvatar } from '@/components/patients/PatientAvatar'
+import { formatTimeRange24 } from '@/lib/formatters'
 
 interface ReservationDrawerProps {
   appointment: Appointment | any
@@ -68,7 +69,7 @@ export function ReservationDrawer({
 
   const dentistName = appointment?.dentist || appointment?.dentist_name || 'Drg Soap Mactavish'
   const treatmentName = appointment?.treatment || appointment?.treatment_name || 'Dental Procedure'
-  const timeRange = appointment?.time || `${appointment?.start_time || '09:00 AM'} › ${appointment?.end_time || '10:00 AM'}`
+  const timeRange = formatTimeRange24(appointment?.time || `${appointment?.start_time || '09:00'} › ${appointment?.end_time || '10:00'}`)
   const dateStr = appointment?.date || 'Today'
 
   const billNumber =

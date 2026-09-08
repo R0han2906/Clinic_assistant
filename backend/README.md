@@ -8,6 +8,11 @@ A robust, high-performance **FastAPI** backend powering the **Zendenta Dental Cl
 
 ```text
 backend/
+├── docs/                           # Dedicated backend technical documentation
+│   ├── README.md                   # Documentation index and reference
+│   ├── ARCHITECTURE.md             # Clean architecture, dual-repository, filelock design
+│   ├── API_DOCUMENTATION.md        # Full 13-module REST API specification
+│   └── PATIENT_REQUESTS_WORKFLOW.md# WhatsApp simulator intake, cancel & approval flow
 ├── app/
 │   ├── app.py                      # Application factory (CORS, RequestIdMiddleware, global error handlers)
 │   ├── main.py                     # ASGI entrypoint for Uvicorn
@@ -102,9 +107,16 @@ The backend supports the Zendenta v3 canonical 7-state machine:
 Relevant Endpoints:
 - `POST /api/v1/appointments` — Create booking
 - `PATCH /api/v1/appointments/{id}/status` — Transition status
-- `POST /api/v1/appointments/{id}/reschedule` — Slot rebooking
+- `POST /api/v1/appointments/{id}/reschedule` — Slot rebooking with conflict check
 - `POST /api/v1/appointments/{id}/cancel` — Cancel appointment with reason
 - `PATCH /api/v1/appointments/{id}/payment` — Settle billing (`paid`)
+- `GET /api/v1/patient-requests?status=...&patient_phone=...&patient_id=...` — WhatsApp inbound requests with phone digit matching
+- `POST /api/v1/patient-requests/{id}/approve` — Staff approval (creates confirmed appointment)
+- `POST /api/v1/patient-requests/{id}/reject` — Staff rejection
+- `POST /api/v1/patient-requests/{id}/cancel` — Patient or staff cancellation
+
+### 🕒 Strict 24-Hour Time Format Standard
+All time parameters and response payloads strictly enforce 24-hour formatting (`HH:mm`, e.g. `09:00`, `14:30`, `17:00`). AM/PM notation is rejected or normalized by backend Pydantic validators.
 
 ### 🛡️ Resilient Serialization & Doctor Mapping
 - **Nullable Foreign Keys**: `AppointmentResponse` supports nullable `patient_id` and `dentist_id` to accommodate database `ON DELETE SET NULL` constraints without raising Pydantic validation errors.

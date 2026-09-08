@@ -11,7 +11,10 @@ import {
   VendorResponse, PeripheralResponse, PeripheralCreate, PeripheralUpdate
 } from '@/types/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL =
+  typeof window !== 'undefined'
+    ? '' // In browser, use same-origin relative URLs with Next.js rewrites (zero CORS, zero IPv6 mismatch)
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000');
 
 class ApiError extends Error {
   constructor(public status: number, public message: string, public data?: any) {
@@ -165,6 +168,7 @@ export const api = {
   patientRequests: {
     list: (status?: string) => request<PatientRequestResponse[]>(`/api/v1/patient-requests${status ? `?status=${status}` : ''}`),
     get: (id: string) => request<PatientRequestResponse>(`/api/v1/patient-requests/${id}`),
+    create: (data: any) => request<PatientRequestResponse>('/api/v1/patient-requests', { method: 'POST', body: JSON.stringify(data) }),
     approve: (id: string, reviewNotes?: string) => request<PatientRequestResponse>(`/api/v1/patient-requests/${id}/approve`, { method: 'POST', body: JSON.stringify({ review_notes: reviewNotes }) }),
     reject: (id: string, reviewNotes?: string) => request<PatientRequestResponse>(`/api/v1/patient-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ review_notes: reviewNotes }) }),
     cancel: (id: string, reviewNotes?: string) => request<PatientRequestResponse>(`/api/v1/patient-requests/${id}/cancel`, { method: 'POST', body: JSON.stringify({ review_notes: reviewNotes }) })

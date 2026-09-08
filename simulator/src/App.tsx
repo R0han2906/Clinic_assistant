@@ -8,6 +8,8 @@ import type {
   AppointmentRequest,
   ExistingPatientRecord,
   Treatment,
+  AlternativeSlot,
+  UpcomingBookingItem,
 } from './types';
 import { mockDentists, mockExistingPatients, mockTreatments } from './mockData';
 import { apiClient } from './apiClient';
@@ -18,6 +20,7 @@ import { ChoiceButtons, type ChoiceOption } from './components/ChoiceButtons';
 import { TextInputStep } from './components/TextInputStep';
 import { DentistPicker } from './components/DentistPicker';
 import { SlotPicker } from './components/SlotPicker';
+import { SlotAlternativesCard } from './components/SlotAlternativesCard';
 import { ReviewCard } from './components/ReviewCard';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { HumanHandoffCard } from './components/HumanHandoffCard';
@@ -61,8 +64,12 @@ export function App() {
   const [selectedDentist, setSelectedDentist] = useState<Dentist | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [selectedDateLabel, setSelectedDateLabel] = useState<string>('');
+  const [slotAlternatives, setSlotAlternatives] = useState<AlternativeSlot[]>([]);
   const [confirmedRequest, setConfirmedRequest] = useState<AppointmentRequest | null>(null);
   const [matchedExistingRecord, setMatchedExistingRecord] = useState<ExistingPatientRecord | null>(null);
+  const [reschedulingAppointment, setReschedulingAppointment] = useState<UpcomingBookingItem | null>(null);
+  const [cancellingAppointment, setCancellingAppointment] = useState<UpcomingBookingItem | null>(null);
+  const [userIntent, setUserIntent] = useState<'book' | 'change' | 'cancel' | 'manage'>('book');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +118,7 @@ export function App() {
 
   function getCurrentTime(): string {
     const now = new Date();
-    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
   const addBotMessage = (text: string, stepId?: StepState) => {
@@ -167,8 +174,12 @@ export function App() {
     setSelectedDentist(null);
     setSelectedSlot(null);
     setSelectedDateLabel('');
+    setSlotAlternatives([]);
     setConfirmedRequest(null);
     setMatchedExistingRecord(null);
+    setReschedulingAppointment(null);
+    setCancellingAppointment(null);
+    setUserIntent('book');
 
     setMessages([
       {
@@ -192,18 +203,23 @@ export function App() {
     addPatientMessage(option.label, 'welcome');
 
     if (option.id === 'action_book') {
+      setUserIntent('book');
+      setReschedulingAppointment(null);
       pushStep('select_patient_type');
       addBotMessage(
         'Are you a new patient or have you visited DentalFlow Clinic before?',
         'select_patient_type'
       );
     } else if (option.id === 'action_change' || option.id === 'action_cancel') {
+      const intent = option.id === 'action_change' ? 'change' : 'cancel';
+      setUserIntent(intent);
       pushStep('existing_patient_lookup');
       addBotMessage(
-        'Please enter your registered phone number or Patient ID (e.g. +91 9988776655 or PAT-000001) to look up your booking:',
+        'Please enter your registered phone number, Patient ID, or Request Reference (e.g. +91 9988776655, PAT-000001, or REQ-000001) to look up your booking:',
         'existing_patient_lookup'
       );
     } else if (option.id === 'action_staff') {
+      setUserIntent('manage');
       pushStep('human_handoff');
       addBotMessage('Connecting you to clinic staff...', 'human_handoff');
     }
@@ -240,7 +256,34 @@ export function App() {
       pushStep('collect_phone');
       addBotMessage('Thank you. Now please enter your Phone Number (so we can send appointment updates):', 'collect_phone');
     } else if (step === 'collect_phone') {
-      setPatientDetails((prev) => ({ ...prev, phone: value }));
+      const phoneVal = value.trim();
+      setPatientDetails((prev) => ({ ...prev, phone: phoneVal }));
+
+      // Firsthand lookup: check if this phone matches an existing clinic patient
+      let match: ExistingPatientRecord | null = null;
+      if (isBackendOnline) {
+        match = await apiClient.searchPatient(phoneVal);
+      }
+      if (!match) {
+        const clean = phoneVal.replace(/\D/g, '');
+        match = mockExistingPatients.find((p) => p.phone.replace(/\D/g, '').includes(clean)) || null;
+      }
+
+      if (match) {
+        setMatchedExistingRecord(match);
+        setPatientDetails({
+          isExisting: true,
+          patientId: match.patientId,
+          fullName: match.fullName,
+          ageOrDob: match.ageOrDob,
+          phone: match.phone,
+        });
+        addBotMessage(
+          `Welcome back, ${match.fullName}! We recognized your phone number and loaded your clinic profile (${match.patientId}).`,
+          'collect_reason'
+        );
+      }
+
       pushStep('collect_reason');
       addBotMessage(
         'Got it! What is the primary reason for your visit? (e.g. Regular checkup, Tooth pain, Cleaning, or press submit to skip):',
@@ -278,7 +321,48 @@ export function App() {
           phone: match.phone,
         });
         pushStep('manage_existing_apt');
-        addBotMessage(`Welcome back, ${match.fullName}! We found your clinic record (${match.patientId}).`, 'manage_existing_apt');
+
+        const activeCount = (match.upcomingAppointments || []).filter(
+          (a) => a.status?.toLowerCase() !== 'cancelled'
+        ).length;
+
+        if (userIntent === 'change') {
+          if (activeCount > 1) {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found ${activeCount} active upcoming bookings on file. Please select which appointment you would like to reschedule from the list below:`,
+              'manage_existing_apt'
+            );
+          } else if (activeCount === 1) {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found your booking. Tap "Change / Reschedule" below to select your new date & time:`,
+              'manage_existing_apt'
+            );
+          } else {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found your record (${match.patientId}), but you have no active upcoming appointments to change. You can book a new appointment anytime:`,
+              'manage_existing_apt'
+            );
+          }
+        } else if (userIntent === 'cancel') {
+          if (activeCount > 1) {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found ${activeCount} active upcoming bookings on file. Please select which appointment you would like to cancel from the list below:`,
+              'manage_existing_apt'
+            );
+          } else if (activeCount === 1) {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found your booking. Tap "Cancel Booking" below to proceed:`,
+              'manage_existing_apt'
+            );
+          } else {
+            addBotMessage(
+              `Welcome back, ${match.fullName}! We found your record (${match.patientId}), but you have no active upcoming appointments to cancel.`,
+              'manage_existing_apt'
+            );
+          }
+        } else {
+          addBotMessage(`Welcome back, ${match.fullName}! We found your clinic record (${match.patientId}).`, 'manage_existing_apt');
+        }
       } else {
         addBotMessage(
           `We couldn't find an existing patient matching "${value}". Would you like to register as a new patient or try searching again?`,
@@ -296,8 +380,31 @@ export function App() {
     addBotMessage(`Here are the available appointment slots for ${dentist.name}:`, 'select_time_range');
   };
 
-  // Slot selection
-  const handleSlotSelect = (slot: TimeSlot, dateLabel: string) => {
+  // Slot selection with condition check & smart alternatives
+  const handleSlotSelect = async (slot: TimeSlot, dateLabel: string) => {
+    if (!slot.isAvailable) {
+      addPatientMessage(`Requested ${dateLabel} at ${slot.startTime} – ${slot.endTime}`, 'select_time_range');
+      setIsSubmitting(true);
+      const alts = await apiClient.getSmartAlternativeSlots(
+        slot.date,
+        slot.startTime,
+        selectedDentist?.id,
+        dentists
+      );
+      setSlotAlternatives(alts);
+      setIsSubmitting(false);
+      pushStep('slot_alternatives');
+      addBotMessage(
+        `⚠️ We checked clinic records: ${selectedDentist?.name || 'The requested doctor'} is not available at ${slot.startTime} on ${dateLabel} (${slot.unavailableReason || 'slot is already booked or outside operating hours'}).`,
+        'slot_alternatives'
+      );
+      addBotMessage(
+        `Here are the top 3 closest available alternative slots calculated for you. Please select an option:`,
+        'slot_alternatives'
+      );
+      return;
+    }
+
     setSelectedSlot(slot);
     setSelectedDateLabel(dateLabel);
     addPatientMessage(`Selected ${dateLabel} at ${slot.startTime} – ${slot.endTime}`, 'select_time_range');
@@ -305,11 +412,86 @@ export function App() {
     addBotMessage('Please review your requested appointment details below before final submission:', 'review');
   };
 
+  const handleAlternativeSelect = (alt: AlternativeSlot) => {
+    const doc = dentists.find((d) => d.id === alt.slot.dentistId) || selectedDentist;
+    if (doc) setSelectedDentist(doc);
+    setSelectedSlot(alt.slot);
+    setSelectedDateLabel(alt.slot.date);
+    addPatientMessage(`Selected alternative: ${alt.slot.startTime} with ${alt.dentistName}`, 'slot_alternatives');
+    pushStep('review');
+    addBotMessage(
+      `Great choice! We have reserved ${alt.slot.startTime} on ${alt.slot.date} with ${alt.dentistName}. Please review your details below:`,
+      'review'
+    );
+  };
+
   // Confirmation with live FastAPI backend call + mock fallback
   const handleConfirmBooking = async () => {
     if (!selectedDentist || !selectedSlot) return;
 
     setIsSubmitting(true);
+
+    // Flow 1: Rescheduling an existing appointment or request
+    if (reschedulingAppointment) {
+      const isApt = reschedulingAppointment.referenceCode.startsWith('APT-');
+      let finalRef = reschedulingAppointment.referenceCode;
+
+      if (isBackendOnline) {
+        if (isApt) {
+          const res = await apiClient.rescheduleAppointment(reschedulingAppointment.referenceCode, {
+            newDate: selectedSlot.date,
+            newStartTime: selectedSlot.startTime,
+            newEndTime: selectedSlot.endTime,
+            newDentistId: selectedDentist.id,
+            reason: patientDetails.reason || 'Rescheduled via WhatsApp Simulator',
+          });
+          if (!res.success) {
+            console.warn('Backend reschedule error:', res.error);
+          }
+        } else {
+          // It's a pending REQ-XXXXXX: cancel the old request & submit an updated request
+          await apiClient.cancelAppointment(reschedulingAppointment.referenceCode, 'Patient modified booking request');
+          try {
+            const reqResult = await apiClient.submitPatientRequest({
+              patientName: patientDetails.fullName,
+              patientPhone: patientDetails.phone,
+              patientAge: patientDetails.ageOrDob,
+              dentistId: selectedDentist.id,
+              preferredDate: selectedSlot.date,
+              preferredStartTime: selectedSlot.startTime,
+              preferredEndTime: selectedSlot.endTime,
+              reason: `Rescheduled from ${reschedulingAppointment.referenceCode}: ${patientDetails.reason || 'Dental Consultation'}`,
+            });
+            finalRef = reqResult.requestId;
+          } catch (err) {
+            console.warn('Backend request submission error:', err);
+          }
+        }
+      }
+
+      const request: AppointmentRequest = {
+        patient: patientDetails,
+        dentist: selectedDentist,
+        date: selectedDateLabel,
+        timeSlot: selectedSlot,
+        referenceCode: finalRef,
+        patientId: patientDetails.patientId,
+        createdTimestamp: getCurrentTime(),
+      };
+
+      setConfirmedRequest(request);
+      setIsSubmitting(false);
+      addPatientMessage('Confirm Reschedule', 'review');
+      pushStep('confirmed');
+      addBotMessage(
+        `🎉 Your appointment has been successfully rescheduled!\nReference: ${finalRef}\nNew Slot: ${selectedDateLabel} at ${selectedSlot.startTime} – ${selectedSlot.endTime} with ${selectedDentist.name}.`,
+        'confirmed'
+      );
+      setReschedulingAppointment(null);
+      return;
+    }
+
+    // Flow 2: Regular new booking request
     let refCode = `REQ-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
     let resolvedPatientId: string | undefined = patientDetails.patientId;
 
@@ -464,13 +646,39 @@ export function App() {
             {currentStep === 'manage_existing_apt' && matchedExistingRecord && (
               <ManageExistingAptCard
                 patientRecord={matchedExistingRecord}
+                intent={userIntent}
                 onBookNew={() => {
+                  setReschedulingAppointment(null);
                   pushStep('select_dentist');
                   addBotMessage('Select your preferred dentist for your new appointment:', 'select_dentist');
                 }}
-                onCancelExisting={() => {
+                onSelectToReschedule={(apt) => {
+                  setReschedulingAppointment(apt);
+                  const doc = dentists.find(
+                    (d) => d.id === apt.dentistId || d.name.toLowerCase() === apt.dentistName.toLowerCase()
+                  );
+                  if (doc) setSelectedDentist(doc);
+                  addPatientMessage(
+                    `I want to reschedule booking ${apt.referenceCode} (${apt.dentistName}, ${apt.date} at ${apt.time})`,
+                    'manage_existing_apt'
+                  );
+                  pushStep('select_dentist');
+                  addBotMessage(
+                    `Understood! You are rescheduling booking ${apt.referenceCode}. Would you like to keep ${apt.dentistName} or choose a different doctor?`,
+                    'select_dentist'
+                  );
+                }}
+                onSelectToCancel={(apt) => {
+                  setCancellingAppointment(apt);
+                  addPatientMessage(
+                    `I want to cancel booking ${apt.referenceCode} (${apt.dentistName}, ${apt.date} at ${apt.time})`,
+                    'manage_existing_apt'
+                  );
                   pushStep('cancel_appointment_confirm');
-                  addBotMessage('Please select a cancellation reason and confirm below:', 'cancel_appointment_confirm');
+                  addBotMessage(
+                    `Please select a cancellation reason for your booking (${apt.referenceCode}) below:`,
+                    'cancel_appointment_confirm'
+                  );
                 }}
                 onEditDetails={() => {
                   pushStep('edit_patient_details');
@@ -523,21 +731,28 @@ export function App() {
             {currentStep === 'cancel_appointment_confirm' && matchedExistingRecord && (
               <CancelAppointmentCard
                 patientRecord={matchedExistingRecord}
+                appointmentToCancel={cancellingAppointment || undefined}
                 onConfirmCancel={async (reason) => {
                   setIsSubmitting(true);
-                  const refCode = matchedExistingRecord.upcomingAppointment?.referenceCode;
+                  const targetApt = cancellingAppointment || matchedExistingRecord.upcomingAppointment;
+                  const refCode = targetApt?.referenceCode;
                   if (isBackendOnline && refCode) {
                     await apiClient.cancelAppointment(refCode, reason);
                   }
-                  // Update record status to cancelled
+                  // Update record status to cancelled in state
                   setMatchedExistingRecord((prev) => {
-                    if (!prev || !prev.upcomingAppointment) return prev;
+                    if (!prev) return prev;
+                    const updatedList: UpcomingBookingItem[] = (prev.upcomingAppointments || []).map((a) =>
+                      a.referenceCode === refCode ? { ...a, status: 'cancelled' } : a
+                    );
+                    const updatedUpcoming: UpcomingBookingItem | undefined =
+                      prev.upcomingAppointment && prev.upcomingAppointment.referenceCode === refCode
+                        ? { ...prev.upcomingAppointment, status: 'cancelled' }
+                        : prev.upcomingAppointment;
                     return {
                       ...prev,
-                      upcomingAppointment: {
-                        ...prev.upcomingAppointment,
-                        status: 'cancelled',
-                      },
+                      upcomingAppointments: updatedList,
+                      upcomingAppointment: updatedUpcoming,
                     };
                   });
                   setIsSubmitting(false);
@@ -546,9 +761,11 @@ export function App() {
                     `Your appointment (${refCode || 'booking'}) has been successfully cancelled. The dental time slot has been released. You can book another appointment anytime!`,
                     'manage_existing_apt'
                   );
+                  setCancellingAppointment(null);
                   pushStep('manage_existing_apt');
                 }}
                 onKeepAppointment={() => {
+                  setCancellingAppointment(null);
                   pushStep('manage_existing_apt');
                   addBotMessage('Your appointment remains confirmed.', 'manage_existing_apt');
                 }}
@@ -575,6 +792,17 @@ export function App() {
               />
             )}
 
+            {currentStep === 'slot_alternatives' && (
+              <SlotAlternativesCard
+                alternatives={slotAlternatives}
+                onSelectAlternative={handleAlternativeSelect}
+                onPickOtherDate={() => {
+                  pushStep('select_time_range');
+                  addBotMessage('Returned to slot picker. Please select another slot or date:', 'select_time_range');
+                }}
+              />
+            )}
+
             {currentStep === 'review' &&
               selectedDentist &&
               selectedSlot && (
@@ -583,6 +811,7 @@ export function App() {
                   dentist={selectedDentist}
                   dateLabel={selectedDateLabel}
                   slot={selectedSlot}
+                  reschedulingAppointment={reschedulingAppointment}
                   onConfirm={handleConfirmBooking}
                   disabled={isSubmitting}
                   onChangeDetails={() => {
@@ -597,6 +826,16 @@ export function App() {
               <ConfirmationCard
                 request={confirmedRequest}
                 onNewRequest={handleRestart}
+                onCancelRequest={async (refCode) => {
+                  if (isBackendOnline) {
+                    await apiClient.cancelAppointment(refCode, 'Cancelled by patient from confirmation card');
+                  }
+                  addPatientMessage(`Cancel booking request ${refCode}`, 'confirmed');
+                  addBotMessage(
+                    `Your booking request (${refCode}) has been successfully cancelled. The dental slot is not reserved.`,
+                    'confirmed'
+                  );
+                }}
                 isBackendOnline={isBackendOnline}
               />
             )}

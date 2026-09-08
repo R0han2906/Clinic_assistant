@@ -27,15 +27,15 @@ export function WhatsAppInboxCard() {
         sender_name: "Rohan Verma",
         sender_phone: "+91 98765 43210",
         message_text: "Can I reschedule my appointment for tomorrow afternoon?",
-        received_at: new Date(Date.now() - 1000 * 60 * 12).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        received_at: new Date(Date.now() - 1000 * 60 * 12).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
         status: "handoff_required"
       },
       {
         id: "WA-002",
         sender_name: "Priya Sharma",
         sender_phone: "+91 98123 45678",
-        message_text: "Selected slot 11:30 AM - 12:00 PM with Dr. Ananya Rao",
-        received_at: new Date(Date.now() - 1000 * 60 * 45).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        message_text: "Selected slot 11:30 - 12:00 with Dr. Ananya Rao",
+        received_at: new Date(Date.now() - 1000 * 60 * 45).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
         status: "pending"
       }
     ]);

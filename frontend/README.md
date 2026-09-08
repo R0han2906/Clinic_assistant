@@ -6,13 +6,26 @@ A modern, high-performance dental clinic management web application built with *
 
 ## 🌟 Key Features (Clinix / Zendenta v3)
 
+- 🕒 **Strict 24-Hour Time Format Standard (`HH:mm`)**
+  - All time displays, calendar axes (`09:00` to `00:00`), appointment cards (`09:00 › 10:00`, `14:30 › 15:30`), drawers, summaries, operating timings (`09:00 - 00:00`), and bot timestamps strictly adhere to 24-hour formatting.
+- ⚡ **Next.js Reverse Proxy & Zero-CORS Architecture**
+  - Server-side rewrites in `next.config.mjs` route `/api/:path*` to `http://127.0.0.1:8000/api/:path*`.
+  - Same-origin relative API requests (`API_URL = ''`) in the browser eliminate CORS preflight latency, IPv6/IPv4 `localhost` resolution mismatches, and connection errors.
+- 💬 **Inbound WhatsApp Booking Requests Review (`features/whatsapp-agent`)**
+  - **Header Alert Capsule (`BookingRequestBadge.tsx`)**: Real-time badge in the top navigation showing pending inbound patient requests with pulse animation.
+  - **Slide-out Review Drawer (`BookingRequestPanel.tsx` & `BookingRequestCard.tsx`)**: Front-desk staff can inspect patient details, visit reason, requested doctor, date, and 24h time slot.
+  - **1-Click Staff Approval / Rejection**: Approving a request automatically registers the patient, creates a confirmed appointment with `source: 'WHATSAPP'`, updates the calendar via `eventBus`, and removes it from the pending review queue.
+- 🚶 **Intelligent Walk-In Intake & On-Duty Roster (`features/walk-in`)**
+  - **Patient Autocomplete (`PatientAutocomplete.tsx`)**: Live search querying `/api/v1/patients/lookup` by phone or name. Existing patient records automatically populate demographics, medical notes, and allergies.
+  - **On-Duty Availability Grid (`DentistAvailabilityGrid.tsx`)**: Real-time shift roster showing active doctors, booked intervals, open 24h slots, and a **"Recommended (Shortest Wait)"** badge.
+  - Generates walk-in appointments tagged with `source: 'WALK_IN'` and status `checked-in` feeding directly into the lobby queue.
 - 📅 **Interactive Provider Calendar (`/reservations`)**
   - Multi-dentist hourly view with dynamic provider columns directly fetched from the backend API (`DEN-000001` Dr. Sarah Wilson, `DEN-000002` Dr. Michael Chen, `DEN-000003` ROHAN).
   - **Timezone-Safe Date Navigation**: Uses local calendar coordinates (`getLocalDateString()`), eliminating UTC day-shift drift across late-night/early-morning hours.
-  - **Bulletproof Time & Collision Engine (`lib/calendar-collision.ts`)**: Parses 24h (`09:00`), 12h (`09:00 AM`), and range strings (`"09:00 AM › 10:00 AM"`) with zero NaN positioning errors and accurate duration scaling.
+  - **24-Hour Time & Collision Engine (`lib/calendar-collision.ts` & `lib/formatters.ts`)**: 24h left-axis marks (`09:00` - `00:00`), composite range formatting (`formatTimeRange24`), zero NaN positioning errors, and accurate duration scaling.
   - **Live Synchronization Bus**: Listens to and dispatches `'appointment-created'` and `'appointment-updated'` DOM events, instantly updating the calendar upon booking, walk-in intake, or status changes.
   - Comprehensive multi-identifier appointment matching (`dentist_id`, `dentistId`, `dentist_name`, `dentist`) ensuring all appointments are visible.
-  - Drag-and-drop reschedule with automatic optimistic updates and backend persistence.
+  - Drag-and-drop reschedule with automatic optimistic updates and backend persistence (`POST /api/v1/appointments/{id}/reschedule`).
   - Deduplicated appointments with status-coded indicator badges (⏱ scheduled, ✓ checked-in, 🔵 in-progress, ✅ completed, 💰 paid).
   - Direct-access operational mode: zero login friction for receptionists.
 - 🩺 **Receptionist-First Permissions & Lifecycle Drawer**
@@ -20,18 +33,13 @@ A modern, high-performance dental clinic management web application built with *
   - **Clinical Separation**: Removed dentist-only medical checkup editing in favor of read-only clinical summaries and receptionist administrative notes.
   - Status-driven bottom action bar dynamically exposing valid receptionist actions.
 - 📄 **Read-Only Visit Summary Panel**
-  - Post-appointment clinical report displaying Chief Complaint, Diagnosis, Prescriptions (with pharmacy flags), Performed Treatments, Dentist Notes, and Itemized Billing.
+  - Post-appointment clinical report displaying Chief Complaint, Diagnosis, Prescriptions (with pharmacy flags), Performed Treatments, Dentist Notes, and Itemized Billing in 24-hour time.
 - 💰 **Take Payment Workflow**
   - 480px modal dialog for recording payments via Cash, Card, Insurance, or Bank Transfer.
   - Automatic balance/change calculation and status transition from `completed` → `paid`.
 - 🔄 **Reschedule & Cancel Dialogs**
-  - Reschedule modal with slot chips, date picker, and dentist selection.
+  - Reschedule modal with 24h slot chips, date picker, and dentist selection.
   - Cancel dialog with structured reason capture, patient notes, and one-click rebook offer.
-- 🏃 **4-Step Walk-In Intake Drawer (`WalkInSheet`)**
-  - Step 1: Search existing patient or quick register new patient.
-  - Step 2: Assign provider with estimated lobby wait time.
-  - Step 3: Select common treatments (Consultation, Emergency Extraction, Cleaning).
-  - Step 4: Summary confirmation directly feeding into the active Waiting Room queue.
 - 🏠 **Real-Time Clinic Overview (`/dashboard`)**
   - Status-aware **Up Next** card (replaces duplicate "Check In" with "Notify Dentist" once patient is checked in).
   - Lobby **Waiting Room** queue with color-coded duration alerts (amber at ≥ 10 min, red at ≥ 20 min).
@@ -128,7 +136,21 @@ frontend/
 │   ├── payments/
 │   │   └── TakePaymentDialog.tsx     # 480px payment intake modal
 │   └── reservations/
-│       └── CalendarBoard.tsx         # Client calendar board & deduplicated grid
+├── features/
+│   ├── walk-in/
+│   │   ├── components/
+│   │   │   ├── PatientAutocomplete.tsx   # Live patient lookup with debounced autocomplete
+│   │   │   └── DentistAvailabilityGrid.tsx # Real-time provider shift roster with 24h slots
+│   │   ├── services/walk-in.service.ts   # Walk-in booking orchestration
+│   │   └── types.ts                      # Walk-in domain interfaces
+│   └── whatsapp-agent/
+│       ├── components/
+│       │   ├── BookingRequestBadge.tsx   # Top nav badge with pending request count & pulse
+│       │   ├── BookingRequestPanel.tsx   # Inbound request review slide-out drawer
+│       │   └── BookingRequestCard.tsx    # Request inspection card with 1-click approve/reject
+│       ├── hooks/useBookingRequests.ts   # Polling hook with real-time eventBus sync
+│       ├── services/booking-request.service.ts # Remote request submission & approval API
+│       └── types.ts                      # Booking request data models
 ├── lib/
 │   ├── api-client.ts                 # Type-safe API client with offline fallbacks
 │   ├── appointment-lifecycle.ts      # 7-state machine, transitions & action mapper
@@ -213,3 +235,34 @@ pnpm start
 ## 🛡️ Offline-First Fallback Architecture
 
 The frontend automatically attempts to connect to the FastAPI backend (`http://localhost:8000`). If the backend is offline or an endpoint is unreachable, the application gracefully falls back to the curated in-memory datasets (`lib/mock-data.ts`) without throwing unhandled console errors.
+
+---
+
+## ⚡ Next.js API Reverse Proxy & Zero-CORS Architecture
+
+In `next.config.mjs`, a server-side rewrite rules proxies all `/api/:path*` requests to the FastAPI backend on `http://127.0.0.1:8000/api/:path*`:
+
+```javascript
+async rewrites() {
+  return [
+    {
+      source: '/api/:path*',
+      destination: 'http://127.0.0.1:8000/api/:path*',
+    },
+  ]
+}
+```
+
+- **Client Benefit**: The browser makes same-origin requests (`/api/v1/...`), avoiding CORS preflight checks, IPv6 `[::1]` resolution mismatches on Windows, and cross-origin fetch failures.
+- **Server Benefit**: Server Components (SSR) connect directly to `http://127.0.0.1:8000`.
+
+---
+
+## 🕒 24-Hour Time Format Standard
+
+All date and time values across the frontend adhere strictly to 24-hour formatting (`HH:mm`):
+- **Calendar Left Axis**: `09:00` to `00:00`
+- **Appointment Cards**: `09:00 › 10:00`, `14:30 › 15:30`
+- **Clinic Operating Timings**: `09:00 - 00:00` (weekdays), `10:00 - 20:00` (weekends)
+- **Formatting Utilities**: Centralized in `lib/formatters.ts` via `formatHour`, `formatTimeTo24`, and `formatTimeRange24`.
+

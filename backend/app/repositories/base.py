@@ -208,7 +208,7 @@ class BaseClinicRepository(ABC):
         pass
 
     @abstractmethod
-    def list_patient_requests(self, status: Optional[str] = None) -> List[Any]:
+    def list_patient_requests(self, status: Optional[str] = None, patient_phone: Optional[str] = None, patient_id: Optional[str] = None) -> List[Any]:
         pass
 
     @abstractmethod

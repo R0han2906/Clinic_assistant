@@ -15,24 +15,78 @@ export function formatPercent(value: number): string {
   return `${value > 0 ? '+' : ''}${value}%`
 }
 
-// ─── Time ─────────────────────────────────────────────────────────────────────
+// ─── Time (24-Hour Strict Format) ─────────────────────────────────────────────
 
-/** 14 → "2:00 PM",  9 → "9:00 AM",  14.5 → "2:30 PM" */
+/** 14 → "14:00",  9 → "09:00",  14.5 → "14:30",  24 → "00:00" */
 export function formatHour(hour: number): string {
-  const wholePart = Math.floor(hour)
-  const minutePart = (hour % 1) * 60
-  const period = wholePart >= 12 ? 'PM' : 'AM'
-  const displayHour = wholePart > 12 ? wholePart - 12 : wholePart === 0 ? 12 : wholePart
-  const displayMin = minutePart === 0 ? '00' : String(minutePart).padStart(2, '0')
-  return `${displayHour}:${displayMin} ${period}`
+  const norm = hour % 24
+  const wholePart = Math.floor(norm)
+  const minutePart = Math.round((norm % 1) * 60)
+  const displayHour = String(wholePart).padStart(2, '0')
+  const displayMin = String(minutePart).padStart(2, '0')
+  return `${displayHour}:${displayMin}`
 }
 
-/** "14:30" → "2:30 PM" */
+/** "2:30 PM" → "14:30",  "09:00 AM" → "09:00",  "14:30" → "14:30",  "12:00 AM" → "00:00" */
+export function formatTimeTo24(timeStr?: string): string {
+  if (!timeStr) return ''
+  const clean = timeStr.trim()
+
+  // Match 12-hour AM/PM format e.g. "09:00 AM", "2:30 pm", "9:00am", "12:00 PM"
+  const ampmMatch = clean.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i)
+  if (ampmMatch) {
+    let hours = parseInt(ampmMatch[1], 10)
+    const minutes = ampmMatch[2]
+    const period = ampmMatch[3]?.toUpperCase()
+    if (period === 'PM' && hours < 12) hours += 12
+    if (period === 'AM' && hours === 12) hours = 0
+    return `${String(hours).padStart(2, '0')}:${minutes}`
+  }
+
+  // Match 24-hour HH:mm
+  const simpleMatch = clean.match(/^(\d{1,2}):(\d{2})/)
+  if (simpleMatch) {
+    return `${String(parseInt(simpleMatch[1], 10)).padStart(2, '0')}:${simpleMatch[2]}`
+  }
+
+  return clean
+}
+
+/**
+ * Parses and formats composite time ranges into strict 24-hour format:
+ * "09:00 AM › 10:00 AM" → "09:00 › 10:00"
+ * "02:30 PM › 03:30 PM" → "14:30 › 15:30"
+ * "10:00 - 11:30" → "10:00 › 11:30"
+ */
+export function formatTimeRange24(rangeStr?: string): string {
+  if (!rangeStr) return ''
+  const trimmed = rangeStr.trim()
+
+  if (trimmed.includes('›')) {
+    return trimmed
+      .split('›')
+      .map((part) => formatTimeTo24(part))
+      .join(' › ')
+  }
+  if (trimmed.includes('–')) {
+    return trimmed
+      .split('–')
+      .map((part) => formatTimeTo24(part))
+      .join(' › ')
+  }
+  if (trimmed.includes(' - ')) {
+    return trimmed
+      .split(' - ')
+      .map((part) => formatTimeTo24(part))
+      .join(' › ')
+  }
+
+  return formatTimeTo24(trimmed)
+}
+
+/** "14:30" → "14:30",  "2:30 PM" → "14:30" */
 export function formatTimeString(time: string): string {
-  const [h, m] = time.split(':').map(Number)
-  const period = h >= 12 ? 'PM' : 'AM'
-  const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h
-  return `${displayH}:${String(m).padStart(2, '0')} ${period}`
+  return formatTimeRange24(time)
 }
 
 // ─── Dates ────────────────────────────────────────────────────────────────────

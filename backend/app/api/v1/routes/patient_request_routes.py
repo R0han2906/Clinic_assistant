@@ -21,10 +21,12 @@ def submit_patient_request(
 @router.get("", response_model=List[PatientRequestResponse])
 def list_patient_requests(
     status: Optional[str] = None,
+    patient_phone: Optional[str] = None,
+    patient_id: Optional[str] = None,
     service: PatientRequestService = Depends(get_patient_request_service)
 ):
-    """List all patient requests with optional status filter (e.g. pending, approved, rejected)."""
-    return service.list_requests(status=status)
+    """List all patient requests with optional status, patient_phone, or patient_id filter."""
+    return service.list_requests(status=status, patient_phone=patient_phone, patient_id=patient_id)
 
 @router.get("/{request_id}", response_model=PatientRequestResponse)
 def get_patient_request(

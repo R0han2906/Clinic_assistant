@@ -43,8 +43,25 @@ Clinix aligns the clinic management dashboard with the **Clinic Receptionist** p
 8. **Timezone-Safe Date Coordinates & Real-Time Event Bus**:
    - `getLocalDateString()` replaces UTC string conversion, guaranteeing queried appointments match the clinic's local day without day-shift artifacts.
    - Custom window event listeners (`'appointment-created'`, `'appointment-updated'`) trigger live calendar refresh cycles upon modal submission without page reloads.
-9. **Bulletproof Collision & Time Engine (`lib/calendar-collision.ts`)**:
-   - Upgraded `parseTimeToHour` parses 12-hour AM/PM (`09:00 AM`), 24-hour formats (`14:30`), and composite range strings (`"09:00 AM › 10:00 AM"`), calculating visual offsets and card heights with zero NaN collapse.
+9. **24-Hour Time & Collision Engine (`lib/calendar-collision.ts` & `lib/formatters.ts`)**:
+   - Upgraded `formatHour`, `formatTimeTo24`, and `formatTimeRange24` enforcing strict 24-hour formatting (`HH:mm`).
+   - `parseTimeToHour` seamlessly handles 24h strings, calculating visual offsets and card heights with zero NaN collapse.
+10. **Intelligent Walk-In Intake & On-Duty Roster (`features/walk-in`)**:
+   - `PatientAutocomplete.tsx`: Live debounced search querying `/api/v1/patients/lookup` by phone or name. Automatically fills patient details, history, and medical alerts.
+   - `DentistAvailabilityGrid.tsx`: Real-time on-duty practitioner roster showing active shift hours, pre-booked intervals, available 24h slots, and dynamic shortest-wait recommendations.
+   - Books confirmed appointments with `source: 'WALK_IN'` and status `checked-in` routing immediately to the lobby waiting queue.
+11. **Inbound WhatsApp Booking Requests Review (`features/whatsapp-agent`)**:
+   - Header badge (`BookingRequestBadge.tsx`) with real-time pending count and pulse indicator.
+   - Slide-out review drawer (`BookingRequestPanel.tsx` & `BookingRequestCard.tsx`) displaying patient details, reason, and requested slot.
+   - 1-click staff approval automatically creates confirmed appointments (`source: 'WHATSAPP'`), updates the calendar via `eventBus`, and removes the request from the pending queue.
+12. **Next.js Reverse Proxy & Zero-CORS Architecture**:
+   - Server-side rewrites in `next.config.mjs` route `/api/:path*` to `http://127.0.0.1:8000/api/:path*`.
+   - Browser client uses same-origin relative URLs (`API_URL = ''`), eliminating CORS preflight overhead, Windows IPv6/IPv4 `localhost` resolution mismatches, and connection errors.
+13. **Strict 24-Hour Time Format Standard (`HH:mm`)**:
+   - Calendar left axis marks: `09:00`, `10:00`, ..., `23:00`, `00:00`.
+   - Appointment cards: `09:00 › 10:00`, `14:30 › 15:30`.
+   - Clinic operating hours: `Open · 09:00 - 00:00`.
+   - WhatsApp bot and simulator message timestamps: `hour12: false`.
 
 ---
 
@@ -117,6 +134,22 @@ frontend/
 │   │   └── TakePaymentDialog.tsx     # 480px payment intake modal
 │   └── reservations/
 │       └── CalendarBoard.tsx         # Client calendar board & deduplicated hourly grid
+│
+├── features/
+│   ├── walk-in/
+│   │   ├── components/
+│   │   │   ├── PatientAutocomplete.tsx   # Live patient lookup with debounced autocomplete
+│   │   │   └── DentistAvailabilityGrid.tsx # Real-time provider shift roster with 24h slots
+│   │   ├── services/walk-in.service.ts   # Walk-in booking orchestration
+│   │   └── types.ts                      # Walk-in domain interfaces
+│   └── whatsapp-agent/
+│       ├── components/
+│       │   ├── BookingRequestBadge.tsx   # Top nav badge with pending request count & pulse
+│       │   ├── BookingRequestPanel.tsx   # Inbound request review slide-out drawer
+│       │   └── BookingRequestCard.tsx    # Request inspection card with 1-click approve/reject
+│       ├── hooks/useBookingRequests.ts   # Polling hook with real-time eventBus sync
+│       ├── services/booking-request.service.ts # Remote request submission & approval API
+│       └── types.ts                      # Booking request data models
 │
 ├── lib/
 │   ├── api-client.ts                 # Type-safe API client with graceful offline fallbacks
@@ -205,8 +238,12 @@ Zendenta v3 features end-to-end integration between frontend actions and backend
 | Save clinical summary | `VisitSummaryPanel.tsx` | `POST /api/v1/appointments/{id}/visit-summary` | `{ "diagnosis": "...", "prescriptions": [...] }` |
 | Take payment | `TakePaymentDialog.tsx` | `PATCH /api/v1/appointments/{id}/payment` | `{ "payment_status": "PAID", "bill_number": "..." }` |
 | Walk-in intake | `WalkInSheet.tsx` | `POST /api/v1/patients`<br>`POST /api/v1/appointments` | Patient data + `{ "source": "WALK_IN", "status": "checked-in" }` |
-| Reschedule appointment | `RescheduleDialog.tsx` | `POST /api/v1/appointments/{id}/reschedule` | `{ "new_date": "...", "new_start_time": "..." }` |
+| Reschedule appointment | `RescheduleDialog.tsx`, `CalendarBoard.tsx` | `POST /api/v1/appointments/{id}/reschedule` | `{ "new_date": "...", "new_start_time": "14:00", ... }` |
 | Cancel appointment | `CancelDialog.tsx` | `POST /api/v1/appointments/{id}/cancel` | `{ "reason": "Patient requested" }` |
 | Patient Directory search | `PatientsDirectory.tsx` | `GET /api/v1/patients?query=...` | (Query param) |
+| Patient lookup autocomplete | `PatientAutocomplete.tsx` | `GET /api/v1/patients/lookup?query=...` | (Query param) |
+| Inbound WhatsApp requests list | `BookingRequestPanel.tsx` | `GET /api/v1/patient-requests?status=pending` | (Query param) |
+| Inbound request approval | `BookingRequestCard.tsx` | `POST /api/v1/patient-requests/{id}/approve` | `{ "review_notes": "..." }` |
+| Inbound request rejection | `BookingRequestCard.tsx` | `POST /api/v1/patient-requests/{id}/reject` | `{ "review_notes": "..." }` |
 | On-demand CSV export | `PatientsDirectory.tsx` | `GET /api/v1/export/patients.csv` | Direct download stream |
 
