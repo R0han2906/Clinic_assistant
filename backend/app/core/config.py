@@ -56,6 +56,13 @@ class Settings(BaseModel):
     LOCK_TIMEOUT_SECONDS: float = 10.0
     AUTO_BACKUP_ON_SAVE: bool = False
 
+    # WhatsApp Business Cloud API Settings (Phase 9)
+    WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "dentalflow_verify_token_2026")
+    WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "dentalflow_app_secret_demo")
+    WHATSAPP_ACCESS_TOKEN: str = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+    WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    WHATSAPP_API_URL: str = os.getenv("WHATSAPP_API_URL", "https://graph.facebook.com/v21.0")
+
 settings = Settings()
 
 # Ensure directories exist for fallback

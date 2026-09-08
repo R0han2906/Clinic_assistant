@@ -101,7 +101,7 @@ export default function DashboardPage() {
           checkedInAt:
             new Date(
               Date.now() -
-                (idx + 1) * 12 * 60000
+              (idx + 1) * 12 * 60000
             ).toISOString(),
 
           // FIX:
@@ -181,11 +181,11 @@ export default function DashboardPage() {
     setAppointments((prev) =>
       prev.map((a) =>
         a.id === apptId ||
-        a.appointment_id === apptId
+          a.appointment_id === apptId
           ? {
-              ...a,
-              status: 'checked-in'
-            }
+            ...a,
+            status: 'checked-in'
+          }
           : a
       )
     )
@@ -356,26 +356,26 @@ export default function DashboardPage() {
           <p className="mt-3 text-3xl font-black">
             $
             {salesSummary?.total_paid !==
-            undefined
+              undefined
               ? Number(
-                  salesSummary.total_paid
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })
+                salesSummary.total_paid
+              ).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })
               : '0.00'}
           </p>
 
           <p className="mt-1 text-xs text-emerald-600 font-medium">
             $
             {salesSummary?.total_pending !==
-            undefined
+              undefined
               ? Number(
-                  salesSummary.total_pending
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })
+                salesSummary.total_pending
+              ).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })
               : '0.00'}{' '}
             pending payment
           </p>
@@ -484,9 +484,8 @@ export default function DashboardPage() {
                       <button
                         onClick={() =>
                           showToast(
-                            `🔔 Attending dentist notified for ${
-                              nextAppt.patient ||
-                              nextAppt.patient_name
+                            `🔔 Attending dentist notified for ${nextAppt.patient ||
+                            nextAppt.patient_name
                             }`
                           )
                         }
@@ -509,7 +508,7 @@ export default function DashboardPage() {
                         onClick={() =>
                           handleCheckIn(
                             nextAppt.id ||
-                              nextAppt.appointment_id
+                            nextAppt.appointment_id
                           )
                         }
                         className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 active:scale-[0.98] transition shadow-sm"
@@ -597,13 +596,12 @@ export default function DashboardPage() {
 
                       <div className="flex items-center gap-3">
                         <span
-                          className={`rounded-lg px-2.5 py-1 text-xs font-bold flex items-center gap-1 border ${
-                            isRed
+                          className={`rounded-lg px-2.5 py-1 text-xs font-bold flex items-center gap-1 border ${isRed
                               ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
                               : isAmber
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : 'bg-muted text-muted-foreground border-border'
-                          }`}
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : 'bg-muted text-muted-foreground border-border'
+                            }`}
                         >
                           <Clock className="size-3" />
                           {minutes} min wait
@@ -719,11 +717,10 @@ export default function DashboardPage() {
 
                   return (
                     <div
-                      key={`sched-${
-                        appt.id ||
+                      key={`sched-${appt.id ||
                         appt.appointment_id ||
                         'apt'
-                      }-${idx}`}
+                        }-${idx}`}
                       className="rounded-xl border border-border/80 p-3 bg-muted/20 space-y-1 text-xs transition hover:bg-muted/40"
                     >
                       <div className="flex items-center justify-between">

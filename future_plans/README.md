@@ -9,16 +9,16 @@ This directory contains comprehensive, step-by-step implementation plans and arc
 
 ## 📑 Feature Specifications & Plans (Auth-Free Clinical Suite)
 
-| # | Module / Feature | Specification Document | Target Areas |
-|---|---|---|---|
-| **01** | **Clinic Branding, Logo & Address Metadata** | [`01_clinic_branding_logo_address.md`](./01_clinic_branding_logo_address.md) | Brand identity, Dynamic Logo SVGs, Clinic contact banner, Invoices & Printouts |
-| **02** | **Navbar & Header Simplification (Staff Hub)** | [`02_navbar_and_header_simplification.md`](./02_navbar_and_header_simplification.md) | `Header.tsx`, `Sidebar.tsx`, My Account station/staff switcher, Clutter removal |
-| **03** | **Calendar Card Overlap & Collision Stacking** | [`03_reservations_calendar_overlap_and_stacking.md`](./03_reservations_calendar_overlap_and_stacking.md) | `CalendarBoard.tsx`, Multi-track layout math, Cancelled/Reassigned visual hierarchy |
-| **04** | **Expanded Timeline: 9:00 AM to 12:00 AM** | [`04_reservations_timeline_9am_to_12am.md`](./04_reservations_timeline_9am_to_12am.md) | 15-Hour grid engine, Slot resolution, Midnight time parser, Drag-drop bounds |
-| **05** | **Merged Financials & Accounts Hub** | [`05_merged_financials_and_accounts_hub.md`](./05_merged_financials_and_accounts_hub.md) | Unification of `/sales` & `/accounts` -> `/financials`, Cashflow KPIs, Ledgers |
-| **06** | **Streamlined Payment Methods** | [`06_payment_methods_streamlining.md`](./06_payment_methods_streamlining.md) | Removal of standalone `/payment-methods` route; embed in Checkout & Accounts |
-| **07** | **Unified Inventory & Physical Assets Hub** | [`07_unified_inventory_and_equipment_hub.md`](./07_unified_inventory_and_equipment_hub.md) | Unification of `/stocks` & `/peripherals` -> `/inventory`, Equipment tracking |
-| **08** | **Master Implementation & Migration Schedule** | [`08_master_implementation_schedule.md`](./08_master_implementation_schedule.md) | 3-Phase rollout roadmap, Zero-regression redirects, Component refactoring |
+| # | Module / Feature | Specification Document | Target Areas | Status |
+|---|---|---|---|---|
+| **01** | **Clinic Branding, Logo & Address Metadata** | [`01_clinic_branding_logo_address.md`](./01_clinic_branding_logo_address.md) | Brand identity, Dynamic Logo SVGs, Clinic contact banner, Invoices | ✅ **Implemented** |
+| **02** | **Navbar & Header Simplification (Staff Hub)** | [`02_navbar_and_header_simplification.md`](./02_navbar_and_header_simplification.md) | `Header.tsx`, `Sidebar.tsx`, My Account staff switcher, Walk-In CTA | ✅ **Implemented** |
+| **03** | **Calendar Card Overlap & Collision Stacking** | [`03_reservations_calendar_overlap_and_stacking.md`](./03_reservations_calendar_overlap_and_stacking.md) | Multi-track equal-column layout math, Cancelled stripe watermark | ✅ **Implemented** |
+| **04** | **Expanded Timeline: 9:00 AM to 12:00 AM** | [`04_reservations_timeline_9am_to_12am.md`](./04_reservations_timeline_9am_to_12am.md) | 15-Hour grid engine, Slot resolution, Midnight time parser, Drag-drop bounds | ✅ **Implemented** |
+| **05** | **Merged Financials & Accounts Hub** | [`05_merged_financials_and_accounts_hub.md`](./05_merged_financials_and_accounts_hub.md) | Unification of `/sales` & `/accounts` -> `/financials`, Cashflow KPIs, Ledgers | ✅ **Implemented** |
+| **06** | **Streamlined Payment Methods** | [`06_payment_methods_streamlining.md`](./06_payment_methods_streamlining.md) | Removal of standalone `/payment-methods` route; embed in Checkout & Accounts | ✅ **Implemented** |
+| **07** | **Unified Inventory & Physical Assets Hub** | [`07_unified_inventory_and_equipment_hub.md`](./07_unified_inventory_and_equipment_hub.md) | Unification of `/stocks` & `/peripherals` -> `/inventory`, Equipment tracking | ✅ **Implemented** |
+| **08** | **Master Implementation & Migration Schedule** | [`08_master_implementation_schedule.md`](./08_master_implementation_schedule.md) | 3-Phase rollout roadmap, Zero-regression redirects, Component refactoring | ✅ **Implemented** |
 
 ---
 

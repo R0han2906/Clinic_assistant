@@ -14,6 +14,10 @@ from app.api.v1.routes.purchase_routes import router as purchase_router
 from app.api.v1.routes.staff_routes import router as staff_router
 from app.api.v1.routes.export_routes import router as export_router
 from app.api.v1.routes.peripheral_routes import router as peripheral_router
+from app.api.v1.routes.whatsapp_routes import router as whatsapp_router
+from app.api.v1.routes.system_routes import router as system_router
+from app.api.v1.routes.financials_routes import router as financials_router
+from app.api.v1.routes.inventory_hub_routes import router as inventory_hub_router
 
 v1_router = APIRouter()
 
@@ -33,3 +37,7 @@ v1_router.include_router(purchase_router)
 v1_router.include_router(staff_router)
 v1_router.include_router(export_router)
 v1_router.include_router(peripheral_router)
+v1_router.include_router(whatsapp_router)
+v1_router.include_router(system_router)
+v1_router.include_router(financials_router)
+v1_router.include_router(inventory_hub_router)

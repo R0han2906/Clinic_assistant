@@ -1,0 +1,18 @@
+# Supabase PostgreSQL Configuration
+DATABASE_URL=postgresql://postgres:VIGILai_789$$@db.puhbtqisawianlqyivyj.supabase.co:5432/postgres
+SUPABASE_URL=https://puhbtqisawianlqyivyj.supabase.co
+SUPABASE_DB_HOST=db.puhbtqisawianlqyivyj.supabase.co
+SUPABASE_DB_PORT=5432
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=VIGILai_789$$
+SUPABASE_DB_NAME=postgres
+SUPABASE_SERVICE_KEY=
+
+# Storage backend: "supabase" (PostgreSQL) or "excel" (fallback)
+STORAGE_BACKEND=supabase
+
+# Clinic Config
+CLINIC_NAME=Zendenta Dental Clinic
+API_V1_PREFIX=/api/v1
+FRONTEND_URL=http://localhost:3000
+SIMULATOR_URL=http://localhost:5173

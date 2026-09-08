@@ -98,15 +98,15 @@ class AvailabilityService:
             if not day_schedule:
                 continue
 
+            def parse_day_time(time_s: str) -> datetime:
+                time_s = time_s.strip()
+                if time_s == "24:00":
+                    return datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+                return datetime.combine(target_date, datetime.strptime(time_s, "%H:%M").time())
+
             try:
-                start_dt = datetime.combine(
-                    target_date,
-                    datetime.strptime(day_schedule.start_time, "%H:%M").time()
-                )
-                end_dt = datetime.combine(
-                    target_date,
-                    datetime.strptime(day_schedule.end_time, "%H:%M").time()
-                )
+                start_dt = parse_day_time(day_schedule.start_time)
+                end_dt = parse_day_time(day_schedule.end_time)
             except ValueError:
                 continue
 

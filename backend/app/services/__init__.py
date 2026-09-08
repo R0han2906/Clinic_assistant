@@ -12,6 +12,7 @@ from app.services.inventory_service import InventoryService
 from app.services.staff_service import StaffService
 from app.services.treatment_service import TreatmentService
 from app.services.peripheral_service import PeripheralService
+from app.services.whatsapp_service import WhatsAppConversationService
 
 def get_patient_service() -> PatientService:
     return PatientService(get_repository())
@@ -51,3 +52,11 @@ def get_treatment_service() -> TreatmentService:
 
 def get_peripheral_service() -> PeripheralService:
     return PeripheralService(get_repository())
+
+def get_whatsapp_service() -> WhatsAppConversationService:
+    return WhatsAppConversationService(
+        patient_service=get_patient_service(),
+        availability_service=get_availability_service(),
+        booking_service=get_booking_service(),
+        patient_request_service=get_patient_request_service()
+    )
